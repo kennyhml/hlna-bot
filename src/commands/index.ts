@@ -1,5 +1,5 @@
-import * as ping from "./ping";
+import * as users from './users';
 
 export const commands = {
-    ping,
+	users,
 };
