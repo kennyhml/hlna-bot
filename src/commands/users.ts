@@ -5,9 +5,7 @@ import {
 	ChatInputCommandInteraction,
 } from 'discord.js';
 import { api } from '../api/api';
-import { getBotJWT } from '../api/auth';
-
-// Initialize the API client
+import { getBotJWT, getProxyJWT } from '../api/auth';
 
 export const data = new SlashCommandBuilder()
 	.setName('users')
@@ -50,21 +48,16 @@ export async function execute(interaction: CommandInteraction) {
 }
 
 async function showMyProfile(interaction: ChatInputCommandInteraction) {
-	const userData = await api.users.getUsers(
-		{
-			discord_id: interaction.user.id,
+	const response = await api.users.getCurrentUser({
+		headers: {
+			Authorization: `Bearer ${await getProxyJWT(interaction.user.id)}`,
 		},
-		{
-			headers: {
-				Authorization: `Bearer ${await getBotJWT()}`,
-			},
-		},
-	);
+	});
 
-	if (!userData.data.length) {
-		await interaction.editReply({ content: 'You dont exist g' });
+	if (response.status == 401) {
+		interaction.editReply({ content: 'Unauthorized.' });
 	} else {
-		await interaction.editReply({ content: userData.data[0].name });
+		await interaction.editReply({ content: 'Hello ' + response.data.name });
 	}
 }
 

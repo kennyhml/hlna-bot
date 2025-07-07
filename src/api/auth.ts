@@ -27,12 +27,16 @@ async function checkForCachedToken(
 }
 
 async function dumpToken(discord_id: DiscordId, token: CachedTokenData) {
-	const data = await fs.readFile('tokencache.json', 'utf-8');
+	var data = '{}';
+	try {
+		data = await fs.readFile('tokencache.json', 'utf-8');
+	} catch (err) {}
 	var json = JSON.parse(data) as { [key: string]: CachedTokenData };
 
 	json[discord_id] = token;
-
-	await fs.writeFile('tokencache.json', JSON.stringify(json, null, 4), 'utf-8');
+	await fs.writeFile('tokencache.json', JSON.stringify(json, null, 4), {
+		encoding: 'utf-8',
+	});
 }
 
 /**
@@ -54,19 +58,26 @@ export async function getProxyJWT(user: DiscordId): Promise<string> {
 
 	let cached = await checkForCachedToken(user);
 	if (cached) {
-		const timeDeltaMin = (cached.expires - new Date().getTime() / 60) / 3600;
-		console.log(`Time left on ${user} token: ${timeDeltaMin}min`);
+		const timeDeltaHours = (cached.expires - new Date().getTime()) / 3600;
+		console.log(`Time left on ${user} token: ${timeDeltaHours.toFixed()}h`);
 		// Refresh the token if less than 1 day is left on it
-		if (timeDeltaMin < 24 * 60) {
+		if (timeDeltaHours < 24) {
 			// TODO: refresh token(), write new data to cache
-			cached.access = '';
-			cached.expires = 0;
+			// cached.access = '';
+			// cached.expires = 0;
 		}
 		return cached.access;
 	}
 
 	console.log(`No cached token found for ${user}, doing proxy auth..`);
-	let response = await api.proxyLogin.proxyLogin({ discord_id: user });
+	let response = await api.proxyLogin.proxyLogin(
+		{ discord_id: user },
+		{
+			headers: {
+				Authorization: `Bearer ${await getBotJWT()}`,
+			},
+		},
+	);
 	if (response.status == 401) {
 		throw Error(response.data as any);
 	}
@@ -75,7 +86,7 @@ export async function getProxyJWT(user: DiscordId): Promise<string> {
 	dumpToken(user, {
 		access: tokenData.access_token,
 		refresh: tokenData.refresh_token,
-		expires: new Date().getTime() / 60 + tokenData.expires_in,
+		expires: new Date().getTime() + tokenData.expires_in,
 	});
 
 	return tokenData.access_token;
