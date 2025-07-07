@@ -56,9 +56,11 @@ export async function getProxyJWT(user: DiscordId): Promise<string> {
 	// TODO: Check if we have a chached (refresh) token for this user already.
 	// If there is no token, use the proxy login to obtain one and cache it.
 
+	const now = Math.floor(Date.now() / 1000);
+
 	let cached = await checkForCachedToken(user);
 	if (cached) {
-		const timeDeltaHours = (cached.expires - new Date().getTime()) / 3600;
+		const timeDeltaHours = (cached.expires - now) / 3600;
 		console.log(`Time left on ${user} token: ${timeDeltaHours.toFixed()}h`);
 		// Refresh the token if less than 1 day is left on it
 		if (timeDeltaHours < 24) {
@@ -86,7 +88,7 @@ export async function getProxyJWT(user: DiscordId): Promise<string> {
 	dumpToken(user, {
 		access: tokenData.access_token,
 		refresh: tokenData.refresh_token,
-		expires: new Date().getTime() + tokenData.expires_in,
+		expires: now + tokenData.expires_in,
 	});
 
 	return tokenData.access_token;

@@ -5,9 +5,9 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsup src --minify",
+    "build": "tsup src ",
     "start": "node dist/index.js",
-    "reload-commands": "tsup src --minify && node dist/deploy-commands.js",
+    "reload-commands": "tsup src && node dist/deploy-commands.js",
     "generate-api": "npx swagger-typescript-api generate --path http://localhost:3000/openapi.json -o ./src/api -n api.gen.ts --axios --api-class-name HlnaApi"
   },
   "repository": {
@@ -26,6 +26,7 @@
     "@types/node": "^24.0.5",
     "openapi-typescript": "^7.8.0",
     "swagger-typescript-api": "^13.2.7",
+    "tsup": "^8.5.0",
     "tsx": "^4.20.3",
     "typescript": "^5.8.3"
   },
