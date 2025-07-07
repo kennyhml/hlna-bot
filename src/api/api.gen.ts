@@ -78,8 +78,9 @@ export type UserIdentifier = {
   user_id?: number;
 };
 
+/** An Error occured */
 export interface Error {
-  message?: string;
+  message: string;
 }
 
 import type {
@@ -284,7 +285,6 @@ export class HlnaApi<
         JWTTokenPair,
         {
           message?: string;
-          test?: string;
         }
       >({
         path: `/login`,
@@ -309,7 +309,6 @@ export class HlnaApi<
         JWTTokenPair,
         {
           message?: string;
-          test?: string;
         }
       >({
         path: `/proxy-login`,
@@ -345,7 +344,6 @@ export class HlnaApi<
         User[],
         {
           message?: string;
-          test?: string;
         }
       >({
         path: `/users`,
@@ -384,7 +382,6 @@ export class HlnaApi<
         User,
         | {
             message?: string;
-            test?: string;
           }
         | Error
       >({
@@ -427,7 +424,6 @@ export class HlnaApi<
         User,
         | {
             message?: string;
-            test?: string;
           }
         | Error
       >({
