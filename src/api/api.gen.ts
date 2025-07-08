@@ -21,7 +21,7 @@ export enum UserRole {
   Member = "Member",
 }
 
-export interface JWTTokenPair {
+export interface JWTData {
   /** The access token to be included in subsequent requests. */
   access_token: string;
   /** The refresh token that can be used to renew the access token. */
@@ -79,7 +79,7 @@ export type UserIdentifier = {
 };
 
 /** An Error occured */
-export interface Error {
+export interface ErrorMessage {
   message: string;
 }
 
@@ -281,17 +281,11 @@ export class HlnaApi<
       },
       params: RequestParams = {},
     ) =>
-      this.request<
-        JWTTokenPair,
-        {
-          message?: string;
-        }
-      >({
+      this.request<JWTData, ErrorMessage>({
         path: `/login`,
         method: "POST",
         body: data,
         type: ContentType.Json,
-        format: "json",
         ...params,
       }),
   };
@@ -305,18 +299,12 @@ export class HlnaApi<
      * @secure
      */
     proxyLogin: (data: UserIdentifier, params: RequestParams = {}) =>
-      this.request<
-        JWTTokenPair,
-        {
-          message?: string;
-        }
-      >({
+      this.request<JWTData, ErrorMessage>({
         path: `/proxy-login`,
         method: "POST",
         body: data,
         secure: true,
         type: ContentType.Json,
-        format: "json",
         ...params,
       }),
   };
@@ -340,12 +328,7 @@ export class HlnaApi<
       },
       params: RequestParams = {},
     ) =>
-      this.request<
-        User[],
-        {
-          message?: string;
-        }
-      >({
+      this.request<User[], ErrorMessage>({
         path: `/users`,
         method: "GET",
         query: query,
@@ -378,13 +361,7 @@ export class HlnaApi<
       },
       params: RequestParams = {},
     ) =>
-      this.request<
-        User,
-        | {
-            message?: string;
-          }
-        | Error
-      >({
+      this.request<User, ErrorMessage>({
         path: `/users`,
         method: "POST",
         body: data,
@@ -403,7 +380,7 @@ export class HlnaApi<
      * @secure
      */
     getCurrentUser: (params: RequestParams = {}) =>
-      this.request<User, any>({
+      this.request<User, ErrorMessage>({
         path: `/users/me`,
         method: "GET",
         secure: true,
@@ -420,13 +397,7 @@ export class HlnaApi<
      * @secure
      */
     getUser: (userId: number, params: RequestParams = {}) =>
-      this.request<
-        User,
-        | {
-            message?: string;
-          }
-        | Error
-      >({
+      this.request<User, ErrorMessage>({
         path: `/users/${userId}`,
         method: "GET",
         secure: true,

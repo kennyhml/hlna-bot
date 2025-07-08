@@ -9,9 +9,10 @@ import {
 	TextInputStyle,
 	User,
 } from 'discord.js';
-import { api } from '../../api/api';
-import { UserRole } from '../../api/api.gen';
-import { getBotJWT } from '../../api/auth';
+
+import { api } from '@/api/api';
+import { ErrorMessage, UserRole } from '@/api/api.gen';
+import { getBotBearerJWT } from '@/api/auth';
 
 const MAX_SUBMISSION_TIME_MS = 60_000;
 
@@ -29,51 +30,48 @@ export async function execute(interaction: CommandInteraction) {
 	await interaction.showModal(modal);
 
 	interaction
-		.awaitModalSubmit({ filter, time: 60_000 })
-		.then(async (modalInteraction) => {
-			const name = modalInteraction.fields.getTextInputValue('username');
-			const password = modalInteraction.fields.getTextInputValue('password');
-
-			await modalInteraction.deferReply({ flags: MessageFlags.Ephemeral });
-
-			try {
-				const response = await api.users.createUser(
-					{
-						name,
-						discord_id: interaction.user.id,
-						role: UserRole.Member,
-						password,
-					},
-					{
-						headers: {
-							Authorization: `Bearer ${await getBotJWT()}`,
-						},
-						timeout: 30_000,
-					},
-				);
-				await modalInteraction.editReply({
-					content: 'User created with ID ' + response.data.id,
-				});
-			} catch (err: any) {
-				if (err.status == 403) {
-					console.log(err);
-					await modalInteraction.editReply({
-						content: err.response.data.message,
-					});
-				}
-				console.log(err);
-				return;
-			}
-		})
+		.awaitModalSubmit({ filter, time: MAX_SUBMISSION_TIME_MS })
+		.then(submitHandler)
 		.catch(async (err) => {
 			if (err.code == 'InteractionCollectorError') {
 				await interaction.followUp({
 					content: 'The interaction timed out. Please try again.',
 					flags: MessageFlags.Ephemeral,
 				});
-			} else {
-				console.log(err);
 			}
+		});
+}
+
+async function submitHandler(interaction: ModalSubmitInteraction) {
+	await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+	const name = interaction.fields.getTextInputValue('username');
+	const password = interaction.fields.getTextInputValue('password');
+
+	const payload = {
+		name,
+		discord_id: interaction.user.id,
+		role: UserRole.Member,
+		password,
+	};
+
+	api.users
+		.createUser(payload, {
+			headers: { Authorization: await getBotBearerJWT() },
+		})
+		.then(async (response) => {
+			await interaction.editReply({
+				content: '[200 OK]:' + response.data,
+			});
+		})
+		.catch(async (err) => {
+			// Username is taken or user is already registered
+			if (err.status === 403) {
+				return await interaction.editReply({
+					content: (err.response.data as ErrorMessage).message,
+				});
+			}
+			throw err;
 		});
 }
 

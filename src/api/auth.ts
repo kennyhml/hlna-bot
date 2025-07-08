@@ -1,7 +1,7 @@
 import fs from 'fs/promises';
 import { config } from '../config';
 import { api } from './api';
-import { DiscordId, JWTTokenPair } from './api.gen';
+import { DiscordId, JWTData } from './api.gen';
 
 interface CachedTokenData {
 	access: string;
@@ -84,7 +84,7 @@ export async function getProxyJWT(user: DiscordId): Promise<string> {
 		throw Error(response.data as any);
 	}
 
-	const tokenData: JWTTokenPair = response.data;
+	const tokenData: JWTData = response.data;
 	dumpToken(user, {
 		access: tokenData.access_token,
 		refresh: tokenData.refresh_token,
@@ -111,7 +111,7 @@ export async function getBotJWT(): Promise<string> {
 		throw Error(response.data as any);
 	}
 
-	const tokenData: JWTTokenPair = response.data;
+	const tokenData: JWTData = response.data;
 
 	botToken = {
 		access: tokenData.access_token,
@@ -125,4 +125,12 @@ export async function getBotJWT(): Promise<string> {
 	// api.instance.defaults.headers.common['Authorization'] = `Bearer ${'123'}`;
 
 	return tokenData.access_token;
+}
+
+export async function getProxyBearerJWT(user: DiscordId): Promise<string> {
+	return `Bearer ${await getProxyJWT(user)}`;
+}
+
+export async function getBotBearerJWT(): Promise<string> {
+	return `Bearer ${await getBotJWT()}`;
 }
