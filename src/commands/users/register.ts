@@ -9,12 +9,21 @@ import {
 	TextInputStyle,
 	User,
 } from 'discord.js';
+import generator from 'generate-password-ts';
 
 import { api } from '@/api/api';
 import { ErrorMessage, UserRole } from '@/api/api.gen';
 import { getBotBearerJWT } from '@/api/auth';
 
+// Timeout until the Modal Interaction expires
 const MAX_SUBMISSION_TIME_MS = 60_000;
+
+// Config to generate the autofilled user password
+const PASSWORD_GENERATION_CONFIG = {
+	length: 20,
+	numbers: true,
+	symbols: true,
+};
 
 export const command = new SlashCommandSubcommandBuilder()
 	.setName('register')
@@ -24,14 +33,16 @@ export async function execute(interaction: CommandInteraction) {
 	if (!interaction.isChatInputCommand()) return;
 
 	const modal = await buildRegisterModalForUser(interaction.user);
-	const filter = (interaction: ModalSubmitInteraction) =>
-		interaction.customId === modal.data.custom_id;
 
 	await interaction.showModal(modal);
 
+	// Create a filter for modal submissions that will identify this one.
+	const filter = (interaction: ModalSubmitInteraction) =>
+		interaction.customId === modal.data.custom_id;
+
 	interaction
 		.awaitModalSubmit({ filter, time: MAX_SUBMISSION_TIME_MS })
-		.then(submitHandler)
+		.then(onSubmit)
 		.catch(async (err) => {
 			if (err.code == 'InteractionCollectorError') {
 				await interaction.followUp({
@@ -42,7 +53,16 @@ export async function execute(interaction: CommandInteraction) {
 		});
 }
 
-async function submitHandler(interaction: ModalSubmitInteraction) {
+/**
+ * Handles the modal being submitted by the user by making the server request.
+ *
+ * As the request may take some time, the reply is always deferred initally.
+ *
+ * If the submitted data and server response is valid, a user is created.
+ *
+ * @param interaction The interaction of the Modal being submitted.
+ */
+async function onSubmit(interaction: ModalSubmitInteraction) {
 	await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
 	const name = interaction.fields.getTextInputValue('username');
@@ -75,6 +95,17 @@ async function submitHandler(interaction: ModalSubmitInteraction) {
 		});
 }
 
+/**
+ *
+ * Builds a Modal that asks the user to enter a username and password.
+ *
+ * @note The username is prefilled with the users unique discord name.
+ * @note password is prefilled with one that is automatically generated.
+ *
+ * @param user The discord user to build the modal for.
+ *
+ * @returns The ModalBuilder to respond with.
+ */
 async function buildRegisterModalForUser(user: User): Promise<ModalBuilder> {
 	const registerPopup = new ModalBuilder()
 		.setCustomId(`user-register-${user.id}`)
@@ -95,17 +126,12 @@ async function buildRegisterModalForUser(user: User): Promise<ModalBuilder> {
 		.setStyle(TextInputStyle.Short)
 		.setMinLength(8)
 		.setMaxLength(20)
-		.setValue('qwd83213ma9$$lal')
+		.setValue(generator.generate(PASSWORD_GENERATION_CONFIG))
 		.setRequired(true);
 
-	const firstRow = new ActionRowBuilder<TextInputBuilder>().addComponents(
-		nameInput,
+	registerPopup.addComponents(
+		new ActionRowBuilder<TextInputBuilder>().addComponents(nameInput),
+		new ActionRowBuilder<TextInputBuilder>().addComponents(passwordInput),
 	);
-
-	const secondRow = new ActionRowBuilder<TextInputBuilder>().addComponents(
-		passwordInput,
-	);
-
-	registerPopup.addComponents(firstRow, secondRow);
 	return registerPopup;
 }
