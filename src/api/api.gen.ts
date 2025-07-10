@@ -11,6 +11,17 @@
  */
 
 /**
+ * The kind of association a user has with a tribe
+ * @example "Admin"
+ */
+export enum TribeAssociation {
+  Owner = "Owner",
+  Admin = "Admin",
+  Member = "Member",
+  Ally = "Ally",
+}
+
+/**
  * The users system role. Controls the scopes the user is granted.
  * @example "Member"
  */
@@ -48,17 +59,58 @@ export type DiscordId = string;
 export type UserId = number;
 
 /**
- * The name of the new user, must be unique across all members. This name, in combination with the password, will be used to obtain a JWT.
+ * The name of a user, must be unique across all members. This name, in combination with the password, will be used to obtain a JWT.
  * @minLength 3
  * @maxLength 32
  * @example "SwedishTerminator"
  */
 export type UserName = string;
 
+/**
+ * The name of a tribe created by a user
+ * @minLength 3
+ * @maxLength 32
+ * @example "TeletubbyClub"
+ */
+export type TribeName = string;
+
+/** A user as the member of a tribe, including their association with the tribe. */
+export interface TribeMember {
+  id: number;
+  /** Discord ID (Snowflake) */
+  discord_id: DiscordId;
+  /** The name of a user, must be unique across all members. This name, in combination with the password, will be used to obtain a JWT. */
+  name: UserName;
+  /** The kind of association a user has with a tribe */
+  association: TribeAssociation;
+  /**
+   * The last time this user was updated
+   * @format date-time
+   */
+  updated?: string;
+  /**
+   * The time that the user joined this tribe
+   * @format date-time
+   */
+  joined: string;
+  /** The ID of the user who last updated this user */
+  updated_by?: number | null;
+}
+
+/** A user created tribe that logically groups users together. */
+export interface Tribe {
+  id: number;
+  /** The name of a tribe created by a user */
+  name: TribeName;
+  /** @format date-time */
+  created: string;
+  members?: TribeMember[];
+}
+
 /** The data of a HLNA user. Does not contain any sensitive data (e.g. passwords). */
 export interface User {
   id: number;
-  /** The name of the new user, must be unique across all members. This name, in combination with the password, will be used to obtain a JWT. */
+  /** The name of a user, must be unique across all members. This name, in combination with the password, will be used to obtain a JWT. */
   name: UserName;
   /** Discord ID (Snowflake) */
   discord_id: DiscordId;
@@ -70,7 +122,7 @@ export interface User {
 
 /** Parametere to unique identify a user */
 export type UserIdentifier = {
-  /** The name of the new user, must be unique across all members. This name, in combination with the password, will be used to obtain a JWT. */
+  /** The name of a user, must be unique across all members. This name, in combination with the password, will be used to obtain a JWT. */
   username?: UserName;
   /** Discord ID (Snowflake) */
   discord_id?: DiscordId;
@@ -308,6 +360,49 @@ export class HlnaApi<
         ...params,
       }),
   };
+  tribes = {
+    /**
+     * @description Returns data of a tribe such as its name, creation date and members.
+     *
+     * @name GetTribe
+     * @summary Gets the data of a given tribe by its ID
+     * @request GET:/tribes/{tribe_id}
+     * @secure
+     */
+    getTribe: (tribeId: number, params: RequestParams = {}) =>
+      this.request<Tribe, ErrorMessage>({
+        path: `/tribes/${tribeId}`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @name CreateTribe
+     * @summary Create a new tribe which logically groups users together
+     * @request POST:/tribes
+     * @secure
+     */
+    createTribe: (
+      data: {
+        /** The name of a tribe created by a user */
+        name: TribeName;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<Tribe, ErrorMessage>({
+        path: `/tribes`,
+        method: "POST",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+  };
   users = {
     /**
      * No description
@@ -347,7 +442,7 @@ export class HlnaApi<
      */
     createUser: (
       data: {
-        /** The name of the new user, must be unique across all members. This name, in combination with the password, will be used to obtain a JWT. */
+        /** The name of a user, must be unique across all members. This name, in combination with the password, will be used to obtain a JWT. */
         name: UserName;
         /** Discord ID (Snowflake) */
         discord_id: DiscordId;

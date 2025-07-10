@@ -5,6 +5,7 @@ import {
 } from 'discord.js';
 import { api } from '../../api/api';
 import { getProxyJWT } from '../../api/auth';
+import { buildUserProfile } from '@/components/user_profile';
 
 export const command = new SlashCommandSubcommandBuilder()
 	.setName('me')
@@ -27,11 +28,13 @@ export async function execute(interaction: CommandInteraction) {
 				interaction.editReply({ content: 'Unauthorized.' });
 			} else {
 				await interaction.editReply({
-					content: 'You are ' + response.data.name,
+					flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
+					components: buildUserProfile(response.data, interaction.user),
 				});
 			}
 		})
 		.catch(async (err) => {
+			console.error(err);
 			await interaction.editReply({ content: err.message });
 		});
 }
