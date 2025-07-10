@@ -11,6 +11,7 @@ import {
 	ButtonStyle,
 	SectionBuilder,
 	SeparatorBuilder,
+	userMention,
 } from 'discord.js';
 
 const HEADER_URL =
@@ -114,12 +115,19 @@ function buildMemberRow(member: TribeMember) {
 }
 
 function addTribeInformation(container: ContainerBuilder, tribe: Tribe) {
+	const created = Math.floor(Date.parse(tribe.created) / 1000);
+
+	const mention = userMention('529805265252646914');
+
 	container.addTextDisplayComponents(
 		new TextDisplayBuilder().setContent(
 			[
 				'-# Please create a tribe if this selection is empty.',
 				'## ⤷ Tribe Information',
-				'- To be added...',
+				`>>> **HLNA Identifier:\t\`#${tribe.id}\`**`,
+				`**Current Owner:\t  \`notkenny._\` (${mention})**`,
+				`**Date of Creation:\t<t:${created}:D>**`,
+				`**Member Count:\t  \`${tribe.members?.length || 0}\`**`,
 			].join('\n'),
 		),
 	);
