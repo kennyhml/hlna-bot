@@ -62,13 +62,17 @@ export function buildTribeManager(options: TribeManagerBuilderOptions) {
 		new MediaGalleryItemBuilder().setURL(TRIBE_SEP_URL),
 	);
 
-	const containerComponent = new ContainerBuilder()
-		.addMediaGalleryComponents(tribeSep)
-		.addActionRowComponents(
+	const containerComponent = new ContainerBuilder().addMediaGalleryComponents(
+		tribeSep,
+	);
+
+	if (options.selectedTribe) {
+		containerComponent.addActionRowComponents(
 			new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
 				tribeSelect,
 			),
 		);
+	}
 
 	if (options.selectedTribe) {
 		addTribeInformation(containerComponent, options.selectedTribe);

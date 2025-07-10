@@ -499,5 +499,39 @@ export class HlnaApi<
         format: "json",
         ...params,
       }),
+
+    /**
+     * @description Gets all Tribes that the user is a part of, regardless of the role
+     *
+     * @name GetUserTribes
+     * @summary Returns all tribes a user is a part of
+     * @request GET:/users/{user_id}/tribes
+     * @secure
+     */
+    getUserTribes: (userId: number, params: RequestParams = {}) =>
+      this.request<Tribe[], ErrorMessage>({
+        path: `/users/${userId}/tribes`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description Gets all Tribes that the user is a part of, regardless of the role
+     *
+     * @name GetCurrentUserTribes
+     * @summary Returns all tribes the user is a part of
+     * @request GET:/users/me/tribes
+     * @secure
+     */
+    getCurrentUserTribes: (params: RequestParams = {}) =>
+      this.request<Tribe[], ErrorMessage>({
+        path: `/users/me/tribes`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
   };
 }
