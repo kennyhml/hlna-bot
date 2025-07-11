@@ -19,9 +19,14 @@ export const command = new SlashCommandBuilder()
 	.setDescription('Display your own user profile, must be registered.');
 
 export async function execute(interaction: CommandInteraction) {
-	const data = await requestTribeData(interaction.user.id);
+	// Fetching the data can take too long to reply in time. Make sure the user knows
+	// that we are working on it.
+	const reply = await interaction.deferReply({
+		flags: MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral,
+	});
 
-	const reply = await interaction.reply({
+	const data = await requestTribeData(interaction.user.id);
+	await reply.edit({
 		flags: MessageFlags.IsComponentsV2,
 		components: buildTribeManager({ tribes: data }),
 	});
@@ -31,6 +36,7 @@ export async function execute(interaction: CommandInteraction) {
 		filter: (i: ButtonInteraction) => interaction.user.id == i.user.id,
 	});
 
+	// Connect the events for this interaction
 	collector.on('collect', async (interaction) => {
 		if (interaction.customId === 'createTribe') {
 			await onTribeCreateRequested(
