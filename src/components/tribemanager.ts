@@ -1,4 +1,5 @@
-import { Tribe, TribeMember } from '@/api/api.gen';
+import { Tribe, TribeAssociation, TribeMember } from '@/api/api.gen';
+import { TribemanagerContext } from '@/commands/tribes';
 import {
 	ContainerBuilder,
 	StringSelectMenuBuilder,
@@ -23,32 +24,24 @@ const TRIBE_SEP_URL =
 const MEMBERS_SEP_URL =
 	'https://media.discordapp.net/attachments/1391884971706421439/1392916906243133600/rules_no_scout_1.png?ex=68714675&is=686ff4f5&hm=6527b63fc6c93d0a8dc1285c8123863704fc9d50d0fd30d0def07e38cea5c4e8&=&format=webp&quality=lossless';
 
-interface TribeManagerBuilderOptions {
-	tribes: Tribe[];
-	selectedTribe?: Tribe;
-}
-
-export function buildTribeManager(options: TribeManagerBuilderOptions) {
-	// Use the first tribe in the list as default if there is one
-	// TODO: In the future it would be nice to let users mark a main tribe.
-	if (!options.selectedTribe && options.tribes.length !== 0) {
-		options.selectedTribe = options.tribes[0];
-	}
-	console.log(options.selectedTribe);
-
+export function buildTribeManager(context: TribemanagerContext) {
 	const tribeSelect = new StringSelectMenuBuilder()
 		.setCustomId('selectedTribe')
-		.setDisabled(options.tribes.length === 0)
+		.setDisabled(context.tribeData.length === 0)
 		.setMaxValues(1)
 		.setPlaceholder('Select a tribe you are a part of.')
 		.setMinValues(1);
 
-	options.tribes.forEach((tribe, index) => {
+	const selectedTribe = context.tribeData.find(
+		(v) => v.id === context.selectedTribe,
+	);
+
+	context.tribeData.forEach((tribe, index) => {
 		tribeSelect.addOptions(
 			new StringSelectMenuOptionBuilder()
 				.setLabel(tribe.name)
 				.setValue(tribe.id.toString())
-				.setDefault(index === 0)
+				.setDefault(tribe.id === selectedTribe?.id)
 				.setDescription('Tribe ' + tribe.name) // TODO: Add a description to the API?
 				.setEmoji('1392603795623641289'),
 		);
@@ -66,7 +59,7 @@ export function buildTribeManager(options: TribeManagerBuilderOptions) {
 		tribeSep,
 	);
 
-	if (options.selectedTribe) {
+	if (selectedTribe) {
 		containerComponent.addActionRowComponents(
 			new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
 				tribeSelect,
@@ -74,14 +67,14 @@ export function buildTribeManager(options: TribeManagerBuilderOptions) {
 		);
 	}
 
-	if (options.selectedTribe) {
-		addTribeInformation(containerComponent, options.selectedTribe);
+	if (selectedTribe) {
+		addTribeInformation(containerComponent, selectedTribe);
 	}
 
-	addTribeManagementButtons(containerComponent, options.selectedTribe);
+	addTribeManagementButtons(containerComponent, selectedTribe);
 
-	if (options.selectedTribe) {
-		addMemberSection(containerComponent, options.selectedTribe.members || []);
+	if (selectedTribe) {
+		addMemberSection(containerComponent, selectedTribe.members || []);
 		containerComponent.addSeparatorComponents(new SeparatorBuilder());
 		addMemberPageButtons(containerComponent, 0, 5);
 	}
@@ -121,7 +114,10 @@ function buildMemberRow(member: TribeMember) {
 function addTribeInformation(container: ContainerBuilder, tribe: Tribe) {
 	const created = Math.floor(Date.parse(tribe.created) / 1000);
 
-	const mention = userMention('529805265252646914');
+	const owner = tribe.members?.find(
+		(m) => m.association === TribeAssociation.Owner,
+	);
+	const mention = owner?.discord_id ? userMention(owner?.discord_id) : 'N/A;';
 
 	container.addTextDisplayComponents(
 		new TextDisplayBuilder().setContent(
@@ -129,7 +125,7 @@ function addTribeInformation(container: ContainerBuilder, tribe: Tribe) {
 				'-# Please create a tribe if this selection is empty.',
 				'## ⤷ Tribe Information',
 				`>>> **HLNA Identifier:\t\`#${tribe.id}\`**`,
-				`**Current Owner:\t  \`notkenny._\` (${mention})**`,
+				`**Current Owner:\t  \`${owner?.name || '-'}\` (${mention})**`,
 				`**Date of Creation:\t<t:${created}:D>**`,
 				`**Member Count:\t  \`${tribe.members?.length || 0}\`**`,
 			].join('\n'),
