@@ -1,9 +1,9 @@
 import * as users from './users';
-import * as config from './config';
 import * as tribes from './tribes';
+import * as configs from './configs';
 
 export const commands = {
 	users,
-	config,
 	tribes,
+	configs,
 };
