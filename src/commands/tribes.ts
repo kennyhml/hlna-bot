@@ -24,7 +24,9 @@ export interface TribemanagerContext {
 	// data of all tribes that can be displayed
 	tribeData: Tribe[];
 	// id of the tribe currently selected
-	selectedTribe: number | undefined;
+	selectedTribe?: number;
+	// Whether the 'new member selection' should be visible
+	memberSelectExpanded?: boolean;
 }
 
 export async function execute(interaction: CommandInteraction) {
@@ -63,6 +65,10 @@ export async function execute(interaction: CommandInteraction) {
 		} else if (interaction.customId == 'selectedTribe') {
 			const values = (interaction as StringSelectMenuInteraction).values;
 			ctx.selectedTribe = parseInt(values[0]);
+			await reply.edit({ components: buildTribeManager(ctx) });
+			await interaction.deferUpdate();
+		} else if (interaction.customId == 'addMember') {
+			ctx.memberSelectExpanded = true;
 			await reply.edit({ components: buildTribeManager(ctx) });
 			await interaction.deferUpdate();
 		}

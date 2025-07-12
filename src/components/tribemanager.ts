@@ -13,6 +13,7 @@ import {
 	SectionBuilder,
 	SeparatorBuilder,
 	userMention,
+	UserSelectMenuBuilder,
 } from 'discord.js';
 
 const HEADER_URL =
@@ -23,6 +24,18 @@ const TRIBE_SEP_URL =
 
 const MEMBERS_SEP_URL =
 	'https://media.discordapp.net/attachments/1391884971706421439/1392916906243133600/rules_no_scout_1.png?ex=68714675&is=686ff4f5&hm=6527b63fc6c93d0a8dc1285c8123863704fc9d50d0fd30d0def07e38cea5c4e8&=&format=webp&quality=lossless';
+
+const OWNER_ICON = '<:Owner:1393335855338356898>';
+const ADMIN_ICON = '<:Admin:1393336036318249120> ';
+const MEMBER_ICON = '<:Member:1393336034967814205> ';
+const ALLY_ICON = '<:Ally:1393336033374113913>';
+
+const RANK_PRIORITY = [
+	TribeAssociation.Owner,
+	TribeAssociation.Admin,
+	TribeAssociation.Member,
+	TribeAssociation.Ally,
+];
 
 export function buildTribeManager(context: TribemanagerContext) {
 	const tribeSelect = new StringSelectMenuBuilder()
@@ -35,6 +48,14 @@ export function buildTribeManager(context: TribemanagerContext) {
 	const selectedTribe = context.tribeData.find(
 		(v) => v.id === context.selectedTribe,
 	);
+
+	if (selectedTribe) {
+		selectedTribe.members?.sort(
+			(a, b) =>
+				RANK_PRIORITY.indexOf(a.association) -
+				RANK_PRIORITY.indexOf(b.association),
+		);
+	}
 
 	context.tribeData.forEach((tribe, index) => {
 		tribeSelect.addOptions(
@@ -72,6 +93,9 @@ export function buildTribeManager(context: TribemanagerContext) {
 	}
 
 	addTribeManagementButtons(containerComponent, selectedTribe);
+	if (context.memberSelectExpanded) {
+		addNewMemberSelect(containerComponent);
+	}
 
 	if (selectedTribe) {
 		addMemberSection(containerComponent, selectedTribe.members || []);
@@ -97,8 +121,8 @@ function addMemberSection(container: ContainerBuilder, members: TribeMember[]) {
 }
 
 function buildMemberRow(member: TribeMember) {
-	const joined = Math.floor(Date.parse(member.joined) / 1000);
-	const content = `### <:XP_Buff_Purple:1392933674294448190> ${member.name} (<@${member.discord_id}>) - Joined <t:${joined}:D>`;
+	const icon = getIconForRole(member.association);
+	const content = `### ${icon} ${member.name} (<@${member.discord_id}>)`;
 
 	return new SectionBuilder()
 		.addTextDisplayComponents(new TextDisplayBuilder().setContent(content))
@@ -147,7 +171,7 @@ function addTribeManagementButtons(container: ContainerBuilder, tribe?: Tribe) {
 	if (tribe) {
 		row.addComponents(
 			new ButtonBuilder()
-				.setCustomId('inviteUser')
+				.setCustomId('addMember')
 				.setLabel('Add a User')
 				.setEmoji('1392921274665144460')
 				.setStyle(ButtonStyle.Success),
@@ -158,11 +182,26 @@ function addTribeManagementButtons(container: ContainerBuilder, tribe?: Tribe) {
 				.setStyle(ButtonStyle.Secondary),
 			new ButtonBuilder()
 				.setCustomId('deleteTribe')
-				.setLabel('Delete Tribe')
+				.setLabel('Leave Tribe')
 				.setEmoji('1392921854221619470')
 				.setStyle(ButtonStyle.Danger),
 		);
 	}
+
+	container.addActionRowComponents(row);
+}
+
+function addNewMemberSelect(container: ContainerBuilder) {
+	container.addTextDisplayComponents(
+		new TextDisplayBuilder().setContent('## ↪ New Member'),
+	);
+	const row = new ActionRowBuilder<UserSelectMenuBuilder>().addComponents(
+		new UserSelectMenuBuilder()
+			.setCustomId('newMember')
+			.setMinValues(1)
+			.setMaxValues(1)
+			.setPlaceholder('Select the User to add to the tribe.'),
+	);
 
 	container.addActionRowComponents(row);
 }
@@ -191,4 +230,17 @@ function addMemberPageButtons(
 	);
 
 	container.addActionRowComponents(row);
+}
+
+function getIconForRole(role: TribeAssociation) {
+	switch (role) {
+		case TribeAssociation.Admin:
+			return ADMIN_ICON;
+		case TribeAssociation.Owner:
+			return OWNER_ICON;
+		case TribeAssociation.Member:
+			return MEMBER_ICON;
+		case TribeAssociation.Ally:
+			return ALLY_ICON;
+	}
 }
