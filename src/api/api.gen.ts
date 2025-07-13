@@ -14,7 +14,7 @@
  * The kind of association a user has with a tribe
  * @example "Admin"
  */
-export enum TribeAssociation {
+export enum TribeRank {
   Owner = "Owner",
   Admin = "Admin",
   Member = "Member",
@@ -82,7 +82,7 @@ export interface TribeMember {
   /** The name of a user, must be unique across all members. This name, in combination with the password, will be used to obtain a JWT. */
   name: UserName;
   /** The kind of association a user has with a tribe */
-  association: TribeAssociation;
+  rank: TribeRank;
   /**
    * The last time this user was updated
    * @format date-time
@@ -172,7 +172,7 @@ export interface Taskgroup {
    * A short description of the taskgroup
    * @example "Checks the towers on 9263"
    */
-  description: string;
+  description?: string | null;
   /**
    * The kind of taskgroup
    * @example "CRAFTING"
@@ -194,9 +194,9 @@ export interface Configuration {
   /** The name of the configuration, unique per user. */
   name: string;
   /** An optional description of the configuration. */
-  description: string;
+  description?: string;
   /** The taskgroups that are bound to this configuration */
-  taskgroups?: Taskgroup[];
+  taskgroups?: Taskgroup[] | null;
 }
 
 /** An Error occured */
@@ -429,6 +429,149 @@ export class HlnaApi<
         ...params,
       }),
   };
+  configs = {
+    /**
+     * No description
+     *
+     * @name CreateConfiguration
+     * @summary Create a new configuration
+     * @request POST:/configs
+     * @secure
+     */
+    createConfiguration: (
+      data: {
+        name: string;
+        description?: string;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<Configuration, ErrorMessage>({
+        path: `/configs`,
+        method: "POST",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @name AddTaskgroup
+     * @summary Adds a taskgroup to this configuration
+     * @request POST:/configs/{config_id}/taskgroups/{taskgroup_id}
+     * @secure
+     */
+    addTaskgroup: (
+      configId: number,
+      taskgroupId: number,
+      data: {
+        /**
+         * The priority of this taskgroup in the configuration
+         * @example "0 (highest)"
+         */
+        priority: number;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<void, ErrorMessage>({
+        path: `/configs/${configId}/taskgroups/${taskgroupId}`,
+        method: "POST",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @name RemoveTaskgroup
+     * @summary Adds a taskgroup to this configuration
+     * @request DELETE:/configs/{config_id}/taskgroups/{taskgroup_id}
+     * @secure
+     */
+    removeTaskgroup: (
+      configId: number,
+      taskgroupId: number,
+      params: RequestParams = {},
+    ) =>
+      this.request<void, ErrorMessage>({
+        path: `/configs/${configId}/taskgroups/${taskgroupId}`,
+        method: "DELETE",
+        secure: true,
+        ...params,
+      }),
+  };
+  taskgroups = {
+    /**
+     * No description
+     *
+     * @name CreateTaskgroup
+     * @summary Create a new task
+     * @request POST:/taskgroups
+     * @secure
+     */
+    createTaskgroup: (
+      data: {
+        name: string;
+        description?: string;
+        kind: string;
+        server: string;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<Taskgroup, ErrorMessage>({
+        path: `/taskgroups`,
+        method: "POST",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @name AddTask
+     * @summary Create a new task
+     * @request POST:/taskgroups/{taskgroup_id}/tasks/{task_id}
+     * @secure
+     */
+    addTask: (
+      taskgroupId: number,
+      taskId: number,
+      params: RequestParams = {},
+    ) =>
+      this.request<void, ErrorMessage>({
+        path: `/taskgroups/${taskgroupId}/tasks/${taskId}`,
+        method: "POST",
+        secure: true,
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @name RemoveTask
+     * @summary Create a new task
+     * @request DELETE:/taskgroups/{taskgroup_id}/tasks/{task_id}
+     * @secure
+     */
+    removeTask: (
+      taskgroupId: number,
+      taskId: number,
+      params: RequestParams = {},
+    ) =>
+      this.request<void, ErrorMessage>({
+        path: `/taskgroups/${taskgroupId}/tasks/${taskId}`,
+        method: "DELETE",
+        secure: true,
+        ...params,
+      }),
+  };
   tasks = {
     /**
      * No description
@@ -530,7 +673,7 @@ export class HlnaApi<
       data: {
         members: UserIdentifier[];
         /** The kind of association a user has with a tribe */
-        grant_role: TribeAssociation;
+        rank: TribeRank;
       },
       params: RequestParams = {},
     ) =>
@@ -541,6 +684,26 @@ export class HlnaApi<
         secure: true,
         type: ContentType.Json,
         format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @name AddConfiguration
+     * @summary Adds a configuration to this tribe
+     * @request POST:/tribes/{tribe_id}/configs/{config_id}
+     * @secure
+     */
+    addConfiguration: (
+      tribeId: number,
+      configId: number,
+      params: RequestParams = {},
+    ) =>
+      this.request<void, ErrorMessage>({
+        path: `/tribes/${tribeId}/configs/${configId}`,
+        method: "POST",
+        secure: true,
         ...params,
       }),
   };

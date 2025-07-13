@@ -1,4 +1,4 @@
-import { Tribe, TribeAssociation, TribeMember } from '@/api/api.gen';
+import { Tribe, TribeRank, TribeMember } from '@/api/api.gen';
 import { TribemanagerContext } from '@/commands/tribes';
 import {
 	ContainerBuilder,
@@ -31,10 +31,10 @@ const MEMBER_ICON = '<:Member:1393336034967814205> ';
 const ALLY_ICON = '<:Ally:1393336033374113913>';
 
 const RANK_PRIORITY = [
-	TribeAssociation.Owner,
-	TribeAssociation.Admin,
-	TribeAssociation.Member,
-	TribeAssociation.Ally,
+	TribeRank.Owner,
+	TribeRank.Admin,
+	TribeRank.Member,
+	TribeRank.Ally,
 ];
 
 export function buildTribeManager(context: TribemanagerContext) {
@@ -51,9 +51,7 @@ export function buildTribeManager(context: TribemanagerContext) {
 
 	if (selectedTribe) {
 		selectedTribe.members?.sort(
-			(a, b) =>
-				RANK_PRIORITY.indexOf(a.association) -
-				RANK_PRIORITY.indexOf(b.association),
+			(a, b) => RANK_PRIORITY.indexOf(a.rank) - RANK_PRIORITY.indexOf(b.rank),
 		);
 	}
 
@@ -121,7 +119,7 @@ function addMemberSection(container: ContainerBuilder, members: TribeMember[]) {
 }
 
 function buildMemberRow(member: TribeMember) {
-	const icon = getIconForRole(member.association);
+	const icon = getIconForRole(member.rank);
 	const content = `### ${icon} ${member.name} (<@${member.discord_id}>)`;
 
 	return new SectionBuilder()
@@ -138,15 +136,12 @@ function buildMemberRow(member: TribeMember) {
 function addTribeInformation(container: ContainerBuilder, tribe: Tribe) {
 	const created = Math.floor(Date.parse(tribe.created) / 1000);
 
-	const owner = tribe.members?.find(
-		(m) => m.association === TribeAssociation.Owner,
-	);
+	const owner = tribe.members?.find((m) => m.rank === TribeRank.Owner);
 	const mention = owner?.discord_id ? userMention(owner?.discord_id) : 'N/A;';
 
 	container.addTextDisplayComponents(
 		new TextDisplayBuilder().setContent(
 			[
-				'-# Please create a tribe if this selection is empty.',
 				'## ⤷ Tribe Information',
 				`>>> **HLNA Identifier:\t\`#${tribe.id}\`**`,
 				`**Current Owner:\t  \`${owner?.name || '-'}\` (${mention})**`,
@@ -163,7 +158,7 @@ function addTribeManagementButtons(container: ContainerBuilder, tribe?: Tribe) {
 	row.addComponents(
 		new ButtonBuilder()
 			.setCustomId('createTribe')
-			.setLabel('Create new Tribe')
+			.setLabel('Create a new Tribe')
 			.setEmoji('1392921273029623950')
 			.setStyle(ButtonStyle.Success),
 	);
@@ -172,17 +167,17 @@ function addTribeManagementButtons(container: ContainerBuilder, tribe?: Tribe) {
 		row.addComponents(
 			new ButtonBuilder()
 				.setCustomId('addMember')
-				.setLabel('Add a User')
+				.setLabel('Add Tribemember')
 				.setEmoji('1392921274665144460')
 				.setStyle(ButtonStyle.Success),
 			new ButtonBuilder()
-				.setCustomId('renameTribe')
-				.setLabel('Rename Tribe')
+				.setCustomId('editTribe')
+				.setLabel('Edit')
 				.setEmoji('1392616309098811503')
 				.setStyle(ButtonStyle.Secondary),
 			new ButtonBuilder()
-				.setCustomId('deleteTribe')
-				.setLabel('Leave Tribe')
+				.setCustomId('leaveTribe')
+				.setLabel('Leave')
 				.setEmoji('1392921854221619470')
 				.setStyle(ButtonStyle.Danger),
 		);
@@ -232,15 +227,15 @@ function addMemberPageButtons(
 	container.addActionRowComponents(row);
 }
 
-function getIconForRole(role: TribeAssociation) {
+function getIconForRole(role: TribeRank) {
 	switch (role) {
-		case TribeAssociation.Admin:
+		case TribeRank.Admin:
 			return ADMIN_ICON;
-		case TribeAssociation.Owner:
+		case TribeRank.Owner:
 			return OWNER_ICON;
-		case TribeAssociation.Member:
+		case TribeRank.Member:
 			return MEMBER_ICON;
-		case TribeAssociation.Ally:
+		case TribeRank.Ally:
 			return ALLY_ICON;
 	}
 }

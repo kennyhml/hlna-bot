@@ -1,5 +1,5 @@
 import { api } from '@/api/api';
-import { Tribe, TribeAssociation } from '@/api/api.gen';
+import { Tribe, TribeRank } from '@/api/api.gen';
 import { getProxyBearerJWT } from '@/api/auth';
 import { MessageFlags, Snowflake, UserSelectMenuInteraction } from 'discord.js';
 
@@ -27,7 +27,7 @@ export async function onNewMemberSelected(
 			tribe.id,
 			{
 				members: [{ discord_id: userId }],
-				grant_role: TribeAssociation.Member,
+				rank: TribeRank.Member,
 			},
 			{
 				headers: {
