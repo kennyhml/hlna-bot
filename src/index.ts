@@ -1,4 +1,4 @@
-import { Client } from 'discord.js';
+import { Client, MessageFlags } from 'discord.js';
 import { config } from './config';
 import { commands } from './commands';
 
@@ -16,8 +16,21 @@ client.on('interactionCreate', async (interaction) => {
 	}
 	const { commandName } = interaction;
 
-	if (commands[commandName as keyof typeof commands]) {
-		commands[commandName as keyof typeof commands].execute(interaction);
+	try {
+		if (commands[commandName as keyof typeof commands]) {
+			await commands[commandName as keyof typeof commands].execute(interaction);
+		}
+	} catch (err) {
+		if (!interaction.replied && !interaction.deferred) {
+			await interaction.reply({
+				content: `An Exception occurred: ${JSON.stringify(err)}`,
+				flags: MessageFlags.Ephemeral,
+			});
+		} else {
+			await interaction.editReply({
+				content: `An Exception occurred: ${JSON.stringify(err)}`,
+			});
+		}
 	}
 });
 

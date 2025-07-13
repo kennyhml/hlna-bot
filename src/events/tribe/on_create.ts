@@ -22,42 +22,48 @@ export async function onTribeCreateRequested(
 	const filter = (interaction: ModalSubmitInteraction) =>
 		interaction.customId === modal.data.custom_id;
 
-	interaction
-		.awaitModalSubmit({ filter, time: MAX_SUBMISSION_TIME_MS })
-		.then(onSubmit)
-		.then(onCreated)
-		.catch(async (err) => {
-			if (err.code == 'InteractionCollectorError') {
-				await interaction.followUp({
-					content: 'The interaction timed out. Please try again.',
-					flags: MessageFlags.Ephemeral,
-				});
-			}
-			console.error(err);
+	var modalInteraction: ModalSubmitInteraction | undefined = undefined;
+
+	try {
+		modalInteraction = await interaction.awaitModalSubmit({
+			filter,
+			time: MAX_SUBMISSION_TIME_MS,
 		});
+		await onSubmit(modalInteraction);
+		await onCreated?.(modalInteraction);
+	} catch (err: any) {
+		if (err.code === 'InteractionCollectorError') {
+			return await interaction.followUp({
+				content: 'The interaction timed out. Please try again.',
+				flags: MessageFlags.Ephemeral,
+			});
+		}
+		const responseError = err.response?.data?.message;
+		console.error(responseError);
+
+		await modalInteraction?.editReply({
+			content: `**\`${err.message} ${responseError}\`**`,
+		});
+	}
 }
 
 async function onSubmit(interaction: ModalSubmitInteraction) {
 	// Make sure the user knows something is going on..
 	await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-	// Make a request to th backend to actually create the tribe
-	await api.tribes
-		.createTribe(
-			{
-				name: interaction.fields.getTextInputValue('tribename'),
+	// Backend request to actually create the tribe
+	const response = await api.tribes.createTribe(
+		{
+			name: interaction.fields.getTextInputValue('tribename'),
+		},
+		{
+			headers: {
+				Authorization: await getProxyBearerJWT(interaction.user.id),
 			},
-			{
-				headers: {
-					Authorization: await getProxyBearerJWT(interaction.user.id),
-				},
-			},
-		)
-		.then(async (response) => {
-			console.log('meow');
-			await interaction.editReply({
-				content: '[200 OK]: Tribe created ' + response.data.id,
-			});
-		});
+		},
+	);
+	if (response.status === 200) {
+		await interaction.editReply({ content: 'Tribe created successfully.' });
+	}
 	return interaction;
 }

@@ -32,6 +32,12 @@ export enum UserRole {
   Member = "Member",
 }
 
+/**
+ * Unique identifier of a HLNA User Account
+ * @example 189581928322
+ */
+export type UserId = number;
+
 export interface JWTData {
   /** The access token to be included in subsequent requests. */
   access_token: string;
@@ -51,12 +57,6 @@ export interface JWTData {
  * @example "410499363476078594"
  */
 export type DiscordId = string;
-
-/**
- * The unique HLNA user id.
- * @example 10571092038192
- */
-export type UserId = number;
 
 /**
  * The name of a user, must be unique across all members. This name, in combination with the password, will be used to obtain a JWT.
@@ -129,6 +129,75 @@ export type UserIdentifier = {
   /** The user ID */
   user_id?: number;
 };
+
+/** A Task to be performed */
+export interface Task {
+  id: number;
+  /** Unique identifier of a HLNA User Account */
+  owner_id: UserId;
+  /**
+   * The name of the task
+   * @example "Gacha#12"
+   */
+  name: string;
+  /**
+   * The kind of task
+   * @example "GACHA_FEED"
+   */
+  kind: string;
+  /** @format json */
+  data: string;
+  /** @format date-time */
+  created: string;
+}
+
+/** A Task to be performed */
+export interface Taskgroup {
+  id: number;
+  /** Unique identifier of a HLNA User Account */
+  owner_id: UserId;
+  /**
+   * The priority of the taskgroup, only in a configuration context.
+   * @example 1
+   */
+  priority?: number;
+  /** Whether the taskgroup is enabled, only in a configuration context. */
+  enabled?: boolean;
+  /**
+   * The name of the taskgroup
+   * @example "Gacha Tower"
+   */
+  name: string;
+  /**
+   * A short description of the taskgroup
+   * @example "Checks the towers on 9263"
+   */
+  description: string;
+  /**
+   * The kind of taskgroup
+   * @example "CRAFTING"
+   */
+  kind: string;
+  /** The server to perform the tasks on */
+  server: string;
+  /** @format date-time */
+  created: string;
+  tasks: Task[];
+}
+
+/** Encapsulates a taskgroups into a runnable configuration */
+export interface Configuration {
+  /** A unique identifier for the configuration */
+  id: number;
+  /** Unique identifier of a HLNA User Account */
+  owner_id: UserId;
+  /** The name of the configuration, unique per user. */
+  name: string;
+  /** An optional description of the configuration. */
+  description: string;
+  /** The taskgroups that are bound to this configuration */
+  taskgroups?: Taskgroup[];
+}
 
 /** An Error occured */
 export interface ErrorMessage {
@@ -360,6 +429,51 @@ export class HlnaApi<
         ...params,
       }),
   };
+  tasks = {
+    /**
+     * No description
+     *
+     * @name CreateTask
+     * @summary Create a new task
+     * @request POST:/tasks
+     * @secure
+     */
+    createTask: (
+      data: {
+        name: string;
+        kind: string;
+        /** @format json */
+        data: string;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<Task, ErrorMessage>({
+        path: `/tasks`,
+        method: "POST",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @name GetTask
+     * @summary Gets the data of the requested task
+     * @request GET:/tasks/{task_id}
+     * @secure
+     */
+    getTask: (taskId: number, params: RequestParams = {}) =>
+      this.request<Task, ErrorMessage>({
+        path: `/tasks/${taskId}`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+  };
   tribes = {
     /**
      * @description Returns data of a tribe such as its name, creation date and members.
@@ -395,6 +509,33 @@ export class HlnaApi<
     ) =>
       this.request<Tribe, ErrorMessage>({
         path: `/tribes`,
+        method: "POST",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @name AddTribeMembers
+     * @summary Adds one or more members to the tribe
+     * @request POST:/tribes/{tribe_id}/members
+     * @secure
+     */
+    addTribeMembers: (
+      tribeId: number,
+      data: {
+        members: UserIdentifier[];
+        /** The kind of association a user has with a tribe */
+        grant_role: TribeAssociation;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<Tribe, ErrorMessage>({
+        path: `/tribes/${tribeId}/members`,
         method: "POST",
         body: data,
         secure: true,
