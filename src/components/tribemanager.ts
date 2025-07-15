@@ -44,11 +44,12 @@ const TribemanagerEvents = {
 	MemberAddRequested: 'MemberAddRequested',
 	EditTribeRequested: 'EditTribeRequested',
 	LeaveTribeRequested: 'LeaveTribeRequested',
-	MemberPromoteRequested: 'MemberKickRequested',
-	MemberDemoteRequested: 'MemberKickRequested',
+	MemberPromoteRequested: 'MemberPromoteRequested',
+	MemberDemoteRequested: 'MemberDemoteRequested',
 	MemberKickRequested: 'MemberKickRequested',
 	PreviousPageRequested: 'PreviousPageRequested',
 	NextPageRequested: 'NextPageRequested',
+	MemberSelected: 'MemberSelected',
 } as const;
 
 export type TribemanagerEvent =
@@ -175,7 +176,9 @@ function buildMemberRow(
 		.setButtonAccessory(
 			new ButtonBuilder()
 				.setLabel(isSelected ? 'Cancel' : 'Manage')
-				.setCustomId(`manage-member-${member.id.toString()}`)
+				.setCustomId(
+					`${TribemanagerEvents.MemberSelected}-${member.id.toString()}`,
+				)
 				.setStyle(isSelected ? ButtonStyle.Danger : ButtonStyle.Secondary)
 				.setEmoji('1392616309098811503'),
 		);

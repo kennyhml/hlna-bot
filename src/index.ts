@@ -42,9 +42,12 @@ client.on('interactionCreate', async (interaction) => {
 	}
 
 	if (interaction.isMessageComponent()) {
-		await EVENT_MAP[interaction.customId as keyof typeof EVENT_MAP](
-			interaction,
-		);
+		const key = interaction.customId.split('-')[0];
+		try {
+			await EVENT_MAP[key as keyof typeof EVENT_MAP](interaction);
+		} catch (err: any) {
+			console.error(err);
+		}
 	}
 });
 

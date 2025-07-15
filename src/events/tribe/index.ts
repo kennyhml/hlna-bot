@@ -5,6 +5,7 @@ import { TribemanagerEvent } from '@/components/tribemanager';
 import { onMemberAddRequested } from './onMemberAddRequested';
 import { onTribeCreateRequested } from './onTribeCreateRequested';
 import onNewMemberSelected from './onNewMemberSelected';
+import onMemberSelected from './onMemberSelected';
 
 type EventHandler = (interaction: Interaction) => Promise<void>;
 
@@ -14,4 +15,5 @@ export const EVENT_MAP: Record<TribemanagerEvent, EventHandler> = {
 	MemberAddRequested: onMemberAddRequested,
 	TribeCreateRequested: onTribeCreateRequested,
 	NewMemberSelected: onNewMemberSelected,
+	MemberSelected: onMemberSelected,
 } as any;
