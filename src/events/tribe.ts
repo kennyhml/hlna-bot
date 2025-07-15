@@ -26,13 +26,19 @@ import {
 type EventHandler = (interaction: Interaction) => Promise<void>;
 
 export const EVENT_MAP: Record<TribemanagerEvent, EventHandler> = {
-	// UserAddRequested: onUserAddRequested,
 	TribeChanged: onTribeChanged,
 	MemberAddRequested: onMemberAddRequested,
 	TribeCreateRequested: onTribeCreateRequested,
 	NewMemberSelected: onNewMemberSelected,
 	MemberSelected: onMemberSelected,
-} as any;
+	EditTribeRequested: async (i: Interaction) => {},
+	LeaveTribeRequested: async (i: Interaction) => {},
+	MemberPromoteRequested: async (i: Interaction) => {},
+	MemberDemoteRequested: async (i: Interaction) => {},
+	MemberKickRequested: onMemberKickRequested,
+	PreviousPageRequested: async (i: Interaction) => {},
+	NextPageRequested: async (i: Interaction) => {},
+};
 
 async function onMemberAddRequested(interaction: Interaction): Promise<void> {
 	if (!interaction.isButton()) {
@@ -235,10 +241,69 @@ async function onTribeCreateRequested(interaction: Interaction) {
 		}, 3000);
 	} catch (err: any) {
 		if (err.code === 'InteractionCollectorError') {
-			return await interaction.followUp({
+			await interaction.followUp({
 				content: 'The interaction timed out. Please try again.',
 				flags: MessageFlags.Ephemeral,
 			});
 		}
 	}
+}
+
+async function onMemberKickRequested(interaction: Interaction) {
+	if (!interaction.isButton()) {
+		return;
+	}
+
+	const ctx = (await loadInteractionContext(
+		interaction.user.id,
+		'Tribemanager',
+		{
+			expected: true,
+		},
+	)) as TribemanagerContext;
+
+	const tribe = ctx.tribes.find((tribe) => tribe.id === ctx.selectedTribe);
+	if (!tribe) {
+		throw Error('Invalid tribe selection.');
+	}
+	const userToKick = tribe.members?.find(
+		(member) => member.id === ctx.selectedMember,
+	);
+
+	if (!userToKick) {
+		throw Error('No member is currently selected.');
+	}
+
+	console.log(
+		`Kick requested for user ${userToKick.name} from tribe ${tribe.name}`,
+	);
+	await interaction.deferUpdate();
+	try {
+		await api.tribes.removeTribemember(tribe.id, userToKick.id, {
+			headers: {
+				Authorization: await getProxyBearerJWT(interaction.user.id),
+			},
+		});
+		console.log('Member kicked successfully.');
+		// Remove the member from the tribe internally to avoid
+		// making another request to get the data.
+		tribe.members = tribe.members?.filter(
+			(member) => member.id !== userToKick.id,
+		);
+		ctx.selectedMember = undefined;
+		addLogMessage(
+			ctx,
+			`${userMention(userToKick.discord_id)} was kicked from \`${tribe.name}\``,
+		);
+	} catch (err: any) {
+		const msg = err.response?.data?.message;
+		console.error(err.response?.data);
+		addLogMessage(ctx, msg);
+	}
+
+	await dumpInteractionContext(ctx);
+	await interaction.editReply({
+		components: buildTribeManager(ctx),
+		flags: MessageFlags.IsComponentsV2,
+	});
 }
