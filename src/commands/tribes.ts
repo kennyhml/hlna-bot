@@ -14,6 +14,13 @@ export const command = new SlashCommandBuilder()
 	.setName('tribes')
 	.setDescription('Display your own user profile, must be registered.');
 
+export type LogAction = {
+	time: string;
+	message: string;
+};
+
+type TribeId = number;
+
 export type TribemanagerContext = {
 	interactionKind: string;
 
@@ -21,11 +28,13 @@ export type TribemanagerContext = {
 	// data of all tribes that can be displayed
 	tribes: Tribe[];
 	// id of the tribe currently selected
-	selectedTribe?: Tribe;
+	selectedTribe?: TribeId;
 	// Whether the 'new member selection' should be visible
 	memberSelectExpanded?: boolean;
 	// A member that is currently selected
 	selectedMember?: UserId;
+	// Action logs of the last few actions
+	logs?: LogAction[];
 };
 
 export async function execute(interaction: CommandInteraction) {
@@ -50,84 +59,6 @@ export async function execute(interaction: CommandInteraction) {
 	});
 }
 
-// 	// Connect the events for this interaction
-// 	collector.on('collect', async (interaction) => {
-// 		console.log(interaction.customId);
-// 		if (interaction.customId === 'createTribe') {
-// 			await onTribeCreateRequested(
-// 				interaction as ButtonInteraction,
-// 				async (submitInteraction: ModalSubmitInteraction) => {
-// 					// Rebuild the tribe manager components
-// 					ctx = await getTribeContextFromServer(interaction.user.id);
-// 					await reply.edit({ components: buildTribeManager(ctx) });
-// 					await submitInteraction.deleteReply();
-// 				},
-// 			);
-// 		} else if (interaction.customId == 'selectedTribe') {
-// 			const values = (interaction as StringSelectMenuInteraction).values;
-// 			ctx.selectedTribe = parseInt(values[0]);
-// 			await reply.edit({ components: buildTribeManager(ctx) });
-// 			await interaction.deferUpdate();
-// 		} else if (interaction.customId == 'addMember') {
-// 			ctx.memberSelectExpanded = true;
-// 			await reply.edit({ components: buildTribeManager(ctx) });
-// 			if (!interaction.replied) {
-// 				await interaction.deferUpdate();
-// 			}
-// 		} else if (interaction.customId == 'newMember') {
-// 			ctx.memberSelectExpanded = false;
-// 			const tribe = ctx.tribeData.find((v) => v.id === ctx.selectedTribe);
-// 			await onNewMemberSelected(
-// 				interaction as UserSelectMenuInteraction,
-// 				tribe!,
-// 			);
-// 			await reply.edit({ components: buildTribeManager(ctx) });
-// 			if (!interaction.replied) {
-// 				await interaction.deferUpdate();
-// 			}
-// 		} else if (interaction.customId.startsWith('manage-member')) {
-// 			const memberId = parseInt(interaction.customId.split('-')[2]);
-
-// 			ctx.memberSelectExpanded = false;
-// 			if (ctx.selectedMember === memberId) {
-// 				ctx.selectedMember = undefined;
-// 			} else {
-// 				ctx.selectedMember = memberId;
-// 			}
-// 			await reply.edit({ components: buildTribeManager(ctx) });
-// 			await interaction.deferUpdate();
-// 		} else if (interaction.customId == 'kickMember') {
-// 			const memberId = ctx.selectedMember;
-// 			if (!memberId) {
-// 				throw Error('Could not get the ID of the member to kick.');
-// 			}
-
-// 			const tribe = ctx.tribeData.find((t) => t.id === ctx.selectedTribe);
-// 			console.log(`Kicking ${memberId} from ${tribe?.name}`);
-// 			try {
-// 				const response = await api.tribes.removeTribemember(
-// 					tribe!.id,
-// 					memberId,
-// 					{
-// 						headers: {
-// 							Authorization: await getProxyBearerJWT(interaction.user.id),
-// 						},
-// 					},
-// 				);
-// 				// Remove the member from the list so we dont need to refetch data.
-// 				tribe?.members?.filter((t) => t.id != memberId);
-// 				ctx.selectedMember = undefined;
-// 				await reply.edit({ components: buildTribeManager(ctx) });
-// 				await interaction.deferUpdate();
-// 			} catch (err: any) {
-// 				await interaction.reply({
-// 					content: `Failed to kick Member:  ${err?.response?.data?.message}`,
-// 				});
-// 			}
-// 		}
-// 	});
-// }
-
 export async function refreshContext(
 	ctx: TribemanagerContext,
 	params: { fetchTribes?: boolean },
@@ -139,21 +70,40 @@ export async function refreshContext(
 			headers: { Authorization: token },
 		});
 		ctx.tribes = response.data;
+		ctx.selectedTribe = ctx.tribes.find(
+			(tribe) => tribe.id === ctx.selectedTribe,
+		)?.id;
 		changes = true;
 	}
 	// Make sure the selected tribe exists in the list
-	if (ctx.selectedTribe && !ctx.tribes.includes(ctx.selectedTribe)) {
+	if (!ctx.tribes.find((tribe) => tribe.id === ctx.selectedTribe)) {
 		ctx.selectedTribe = undefined;
+		ctx.memberSelectExpanded = false;
 		changes = true;
 	}
 
 	// If no tribe is currently selected, use the first tribe as default.
 	if (!ctx.selectedTribe && ctx.tribes.length !== 0) {
-		ctx.selectedTribe = ctx.tribes[0];
+		ctx.selectedTribe = ctx.tribes[0].id;
+		ctx.memberSelectExpanded = false;
 		changes = true;
 	}
 
 	if (changes) {
 		await dumpInteractionContext(ctx);
+	}
+}
+
+export function addLogMessage(ctx: TribemanagerContext, log: string) {
+	if (!ctx.logs) {
+		ctx.logs = [];
+	}
+	ctx.logs.push({
+		time: new Date().toLocaleTimeString('en-US', { hour12: false }),
+		message: log,
+	});
+
+	if (ctx.logs.length > 5) {
+		ctx.logs.shift();
 	}
 }

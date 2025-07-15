@@ -1,5 +1,5 @@
 import { Tribe, TribeRank, TribeMember } from '@/api/api.gen';
-import { TribemanagerContext } from '@/commands/tribes';
+import { LogAction, TribemanagerContext } from '@/commands/tribes';
 import {
 	ContainerBuilder,
 	StringSelectMenuBuilder,
@@ -40,7 +40,7 @@ const RANK_PRIORITY = [
 const TribemanagerEvents = {
 	TribeChanged: 'TribeChanged',
 	TribeCreateRequested: 'TribeCreateRequested',
-	UserAddRequested: 'UserAddRequested',
+	NewMemberSelected: 'NewMemberSelected',
 	MemberAddRequested: 'MemberAddRequested',
 	EditTribeRequested: 'EditTribeRequested',
 	LeaveTribeRequested: 'LeaveTribeRequested',
@@ -62,8 +62,12 @@ export function buildTribeManager(context: TribemanagerContext) {
 		.setPlaceholder('Select a tribe you are a part of.')
 		.setMinValues(1);
 
-	if (context.selectedTribe) {
-		context.selectedTribe.members?.sort(
+	const selectedTribe = context.tribes.find(
+		(tribe) => tribe.id === context.selectedTribe,
+	);
+
+	if (selectedTribe) {
+		selectedTribe.members?.sort(
 			(a, b) => RANK_PRIORITY.indexOf(a.rank) - RANK_PRIORITY.indexOf(b.rank),
 		);
 	}
@@ -73,7 +77,7 @@ export function buildTribeManager(context: TribemanagerContext) {
 			new StringSelectMenuOptionBuilder()
 				.setLabel(tribe.name)
 				.setValue(tribe.id.toString())
-				.setDefault(tribe.id === context.selectedTribe?.id)
+				.setDefault(tribe.id === selectedTribe?.id)
 				.setDescription('Tribe ' + tribe.name) // TODO: Add a description to the API?
 				.setEmoji('1392603795623641289'),
 		);
@@ -91,7 +95,7 @@ export function buildTribeManager(context: TribemanagerContext) {
 		tribeSep,
 	);
 
-	if (context.selectedTribe) {
+	if (selectedTribe) {
 		containerComponent.addActionRowComponents(
 			new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
 				tribeSelect,
@@ -99,31 +103,33 @@ export function buildTribeManager(context: TribemanagerContext) {
 		);
 	}
 
-	if (context.selectedTribe) {
-		addTribeInformation(containerComponent, context.selectedTribe);
+	if (selectedTribe) {
+		addTribeInformation(containerComponent, selectedTribe);
 	}
 
-	addTribeManagementButtons(containerComponent, context.selectedTribe);
+	addTribeManagementButtons(containerComponent, selectedTribe);
 	if (context.memberSelectExpanded) {
 		addNewMemberSelect(containerComponent);
 	}
 
-	if (context.selectedTribe) {
+	if (selectedTribe) {
 		addMemberSection(
 			containerComponent,
-			context.selectedTribe.members || [],
+			selectedTribe.members || [],
 			context.selectedMember,
 		);
 		if (context.selectedMember) {
 			buildMemberActions(
 				containerComponent,
-				context.selectedTribe.members?.find(
-					(m) => m.id === context.selectedMember,
-				)!,
+				selectedTribe.members?.find((m) => m.id === context.selectedMember)!,
 			);
 		}
 		containerComponent.addSeparatorComponents(new SeparatorBuilder());
 		addMemberPageButtons(containerComponent, 0, 5);
+	}
+
+	if (context.logs?.length !== 0) {
+		addLogArea(containerComponent, context.logs!);
 	}
 
 	containerComponent.setAccentColor(0x00e5fe);
@@ -142,7 +148,6 @@ function addMemberSection(
 		),
 	);
 
-	console.log(selected);
 	members.forEach((member, index) =>
 		container.addSectionComponents(
 			buildMemberRow(
@@ -273,7 +278,7 @@ function addNewMemberSelect(container: ContainerBuilder) {
 	);
 	const row = new ActionRowBuilder<UserSelectMenuBuilder>().addComponents(
 		new UserSelectMenuBuilder()
-			.setCustomId(TribemanagerEvents.UserAddRequested)
+			.setCustomId(TribemanagerEvents.NewMemberSelected)
 			.setMinValues(1)
 			.setMaxValues(1)
 			.setPlaceholder('Select the User to add to the tribe.'),
@@ -306,6 +311,17 @@ function addMemberPageButtons(
 	);
 
 	container.addActionRowComponents(row);
+}
+
+function addLogArea(container: ContainerBuilder, logs: LogAction[]) {
+	if (!logs) {
+		return;
+	}
+	const content = new TextDisplayBuilder().setContent(
+		'\n## ⤷ Action Output\n' +
+			logs.map((log) => `-# \\> **${log.time}: ${log.message}**`).join('\n'),
+	);
+	container.addTextDisplayComponents(content);
 }
 
 function getIconForRole(role: TribeRank) {

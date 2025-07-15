@@ -20,7 +20,7 @@ export async function onTribeChanged(interaction: Interaction) {
 		'Tribemanager',
 	)) as TribemanagerContext;
 
-	ctx.selectedTribe = ctx.tribes.find((tribe) => tribe.id === selectedTribeId);
+	ctx.selectedTribe = selectedTribeId;
 	await dumpInteractionContext(ctx);
 
 	await interaction.update({

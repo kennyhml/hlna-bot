@@ -27,6 +27,7 @@ client.on('interactionCreate', async (interaction) => {
 				);
 			}
 		} catch (err) {
+			console.error(err);
 			if (!interaction.replied && !interaction.deferred) {
 				await interaction.reply({
 					content: `An Exception occurred: ${JSON.stringify(err)}`,

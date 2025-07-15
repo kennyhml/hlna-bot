@@ -25,6 +25,5 @@ export async function onMemberAddRequested(
 		await dumpInteractionContext(ctx);
 	}
 
-	console.log(ctx);
 	await interaction.update({ components: buildTribeManager(ctx) });
 }
