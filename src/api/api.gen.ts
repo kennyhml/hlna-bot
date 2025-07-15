@@ -706,6 +706,26 @@ export class HlnaApi<
         secure: true,
         ...params,
       }),
+
+    /**
+     * No description
+     *
+     * @name RemoveTribemember
+     * @summary Removes the tribemember from this tribe
+     * @request DELETE:/tribes/{tribe_id}/members/{user_id}
+     * @secure
+     */
+    removeTribemember: (
+      tribeId: number,
+      userId: UserId,
+      params: RequestParams = {},
+    ) =>
+      this.request<void, ErrorMessage>({
+        path: `/tribes/${tribeId}/members/${userId}`,
+        method: "DELETE",
+        secure: true,
+        ...params,
+      }),
   };
   users = {
     /**

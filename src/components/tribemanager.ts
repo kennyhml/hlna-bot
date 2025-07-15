@@ -37,30 +37,43 @@ const RANK_PRIORITY = [
 	TribeRank.Ally,
 ];
 
+const TribemanagerEvents = {
+	TribeChanged: 'TribeChanged',
+	TribeCreateRequested: 'TribeCreateRequested',
+	UserAddRequested: 'UserAddRequested',
+	MemberAddRequested: 'MemberAddRequested',
+	EditTribeRequested: 'EditTribeRequested',
+	LeaveTribeRequested: 'LeaveTribeRequested',
+	MemberPromoteRequested: 'MemberKickRequested',
+	MemberDemoteRequested: 'MemberKickRequested',
+	MemberKickRequested: 'MemberKickRequested',
+	PreviousPageRequested: 'PreviousPageRequested',
+	NextPageRequested: 'NextPageRequested',
+} as const;
+
+export type TribemanagerEvent =
+	(typeof TribemanagerEvents)[keyof typeof TribemanagerEvents];
+
 export function buildTribeManager(context: TribemanagerContext) {
 	const tribeSelect = new StringSelectMenuBuilder()
-		.setCustomId('selectedTribe')
-		.setDisabled(context.tribeData.length === 0)
+		.setCustomId(TribemanagerEvents.TribeChanged)
+		.setDisabled(context.tribes.length === 0)
 		.setMaxValues(1)
 		.setPlaceholder('Select a tribe you are a part of.')
 		.setMinValues(1);
 
-	const selectedTribe = context.tribeData.find(
-		(v) => v.id === context.selectedTribe,
-	);
-
-	if (selectedTribe) {
-		selectedTribe.members?.sort(
+	if (context.selectedTribe) {
+		context.selectedTribe.members?.sort(
 			(a, b) => RANK_PRIORITY.indexOf(a.rank) - RANK_PRIORITY.indexOf(b.rank),
 		);
 	}
 
-	context.tribeData.forEach((tribe, index) => {
+	context.tribes.forEach((tribe, index) => {
 		tribeSelect.addOptions(
 			new StringSelectMenuOptionBuilder()
 				.setLabel(tribe.name)
 				.setValue(tribe.id.toString())
-				.setDefault(tribe.id === selectedTribe?.id)
+				.setDefault(tribe.id === context.selectedTribe?.id)
 				.setDescription('Tribe ' + tribe.name) // TODO: Add a description to the API?
 				.setEmoji('1392603795623641289'),
 		);
@@ -78,7 +91,7 @@ export function buildTribeManager(context: TribemanagerContext) {
 		tribeSep,
 	);
 
-	if (selectedTribe) {
+	if (context.selectedTribe) {
 		containerComponent.addActionRowComponents(
 			new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
 				tribeSelect,
@@ -86,17 +99,29 @@ export function buildTribeManager(context: TribemanagerContext) {
 		);
 	}
 
-	if (selectedTribe) {
-		addTribeInformation(containerComponent, selectedTribe);
+	if (context.selectedTribe) {
+		addTribeInformation(containerComponent, context.selectedTribe);
 	}
 
-	addTribeManagementButtons(containerComponent, selectedTribe);
+	addTribeManagementButtons(containerComponent, context.selectedTribe);
 	if (context.memberSelectExpanded) {
 		addNewMemberSelect(containerComponent);
 	}
 
-	if (selectedTribe) {
-		addMemberSection(containerComponent, selectedTribe.members || []);
+	if (context.selectedTribe) {
+		addMemberSection(
+			containerComponent,
+			context.selectedTribe.members || [],
+			context.selectedMember,
+		);
+		if (context.selectedMember) {
+			buildMemberActions(
+				containerComponent,
+				context.selectedTribe.members?.find(
+					(m) => m.id === context.selectedMember,
+				)!,
+			);
+		}
 		containerComponent.addSeparatorComponents(new SeparatorBuilder());
 		addMemberPageButtons(containerComponent, 0, 5);
 	}
@@ -106,31 +131,87 @@ export function buildTribeManager(context: TribemanagerContext) {
 	return [header, containerComponent];
 }
 
-function addMemberSection(container: ContainerBuilder, members: TribeMember[]) {
+function addMemberSection(
+	container: ContainerBuilder,
+	members: TribeMember[],
+	selected?: number,
+) {
 	container.addMediaGalleryComponents(
 		new MediaGalleryBuilder().addItems(
 			new MediaGalleryItemBuilder().setURL(MEMBERS_SEP_URL),
 		),
 	);
 
-	members.forEach((member) =>
-		container.addSectionComponents(buildMemberRow(member)),
+	console.log(selected);
+	members.forEach((member, index) =>
+		container.addSectionComponents(
+			buildMemberRow(
+				member,
+				member.id === selected,
+				index === 4 && selected !== undefined,
+			),
+		),
 	);
 }
 
-function buildMemberRow(member: TribeMember) {
+function buildMemberRow(
+	member: TribeMember,
+	isSelected: boolean,
+	showInfo: boolean,
+) {
 	const icon = getIconForRole(member.rank);
-	const content = `### ${icon} ${member.name} (<@${member.discord_id}>)`;
+	var content = `### ${icon} ${member.name} (<@${member.discord_id}>)`;
+	if (showInfo) {
+		content += '\n## ⤷ Tribemember Actions';
+	}
 
 	return new SectionBuilder()
 		.addTextDisplayComponents(new TextDisplayBuilder().setContent(content))
 		.setButtonAccessory(
 			new ButtonBuilder()
-				.setLabel('Manage')
-				.setCustomId(member.id.toString())
-				.setStyle(ButtonStyle.Secondary)
+				.setLabel(isSelected ? 'Cancel' : 'Manage')
+				.setCustomId(`manage-member-${member.id.toString()}`)
+				.setStyle(isSelected ? ButtonStyle.Danger : ButtonStyle.Secondary)
 				.setEmoji('1392616309098811503'),
 		);
+}
+
+function buildMemberActions(container: ContainerBuilder, member: TribeMember) {
+	const currentRankIndex = RANK_PRIORITY.findIndex((v) => v === member.rank);
+
+	const row = new ActionRowBuilder<ButtonBuilder>();
+
+	//TODO: Check if we have permissions to demote / promote (either owner or admin)
+	if (currentRankIndex !== 0) {
+		const nextRank = RANK_PRIORITY[currentRankIndex - 1];
+		row.addComponents(
+			new ButtonBuilder()
+				.setCustomId(TribemanagerEvents.MemberPromoteRequested)
+				.setStyle(ButtonStyle.Success)
+				.setEmoji(getIconForRole(nextRank))
+				.setLabel(`Promote to ${nextRank}`),
+		);
+	}
+	if (currentRankIndex !== RANK_PRIORITY.length - 1) {
+		const previousRank = RANK_PRIORITY[currentRankIndex + 1];
+		row.addComponents(
+			new ButtonBuilder()
+				.setCustomId(TribemanagerEvents.MemberDemoteRequested)
+				.setStyle(ButtonStyle.Secondary)
+				.setEmoji(getIconForRole(previousRank))
+				.setLabel(`Demote to ${previousRank}`),
+		);
+	}
+
+	row.addComponents(
+		new ButtonBuilder()
+			.setCustomId(TribemanagerEvents.MemberKickRequested)
+			.setStyle(ButtonStyle.Danger)
+			.setEmoji('1392921854221619470')
+			.setLabel('Remove from Tribe'),
+	);
+
+	container.addActionRowComponents(row);
 }
 
 function addTribeInformation(container: ContainerBuilder, tribe: Tribe) {
@@ -157,7 +238,7 @@ function addTribeManagementButtons(container: ContainerBuilder, tribe?: Tribe) {
 
 	row.addComponents(
 		new ButtonBuilder()
-			.setCustomId('createTribe')
+			.setCustomId(TribemanagerEvents.TribeCreateRequested)
 			.setLabel('Create a new Tribe')
 			.setEmoji('1392921273029623950')
 			.setStyle(ButtonStyle.Success),
@@ -166,17 +247,17 @@ function addTribeManagementButtons(container: ContainerBuilder, tribe?: Tribe) {
 	if (tribe) {
 		row.addComponents(
 			new ButtonBuilder()
-				.setCustomId('addMember')
+				.setCustomId(TribemanagerEvents.MemberAddRequested)
 				.setLabel('Add Tribemember')
 				.setEmoji('1392921274665144460')
 				.setStyle(ButtonStyle.Success),
 			new ButtonBuilder()
-				.setCustomId('editTribe')
+				.setCustomId(TribemanagerEvents.EditTribeRequested)
 				.setLabel('Edit')
 				.setEmoji('1392616309098811503')
 				.setStyle(ButtonStyle.Secondary),
 			new ButtonBuilder()
-				.setCustomId('leaveTribe')
+				.setCustomId(TribemanagerEvents.LeaveTribeRequested)
 				.setLabel('Leave')
 				.setEmoji('1392921854221619470')
 				.setStyle(ButtonStyle.Danger),
@@ -192,7 +273,7 @@ function addNewMemberSelect(container: ContainerBuilder) {
 	);
 	const row = new ActionRowBuilder<UserSelectMenuBuilder>().addComponents(
 		new UserSelectMenuBuilder()
-			.setCustomId('newMember')
+			.setCustomId(TribemanagerEvents.UserAddRequested)
 			.setMinValues(1)
 			.setMaxValues(1)
 			.setPlaceholder('Select the User to add to the tribe.'),
@@ -208,7 +289,7 @@ function addMemberPageButtons(
 ) {
 	const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
 		new ButtonBuilder()
-			.setCustomId('prev')
+			.setCustomId(TribemanagerEvents.PreviousPageRequested)
 			.setLabel('↩ Show Previous Members Page')
 			.setStyle(ButtonStyle.Primary)
 			.setDisabled(currentPage == 0),
@@ -218,7 +299,7 @@ function addMemberPageButtons(
 			.setStyle(ButtonStyle.Secondary)
 			.setDisabled(true),
 		new ButtonBuilder()
-			.setCustomId('next')
+			.setCustomId(TribemanagerEvents.NextPageRequested)
 			.setLabel('Show Next Members Page ↪')
 			.setStyle(ButtonStyle.Primary)
 			.setDisabled(currentPage + 1 === maxPages),
