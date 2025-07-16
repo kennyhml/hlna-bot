@@ -37,8 +37,8 @@ export const EVENT_MAP: Record<TribemanagerEvent, EventHandler> = {
 	MemberPromoteRequested: onMemberPromoteRequested,
 	MemberDemoteRequested: onMemberDemoteRequested,
 	MemberKickRequested: onMemberKickRequested,
-	PreviousPageRequested: async (i: Interaction) => {},
-	NextPageRequested: async (i: Interaction) => {},
+	PreviousPageRequested: onPreviousPageRequested,
+	NextPageRequested: onNextPageRequested,
 };
 
 async function onMemberAddRequested(interaction: Interaction): Promise<void> {
@@ -174,6 +174,7 @@ async function onTribeChanged(interaction: Interaction) {
 
 	ctx.selectedTribe = selectedTribeId;
 	ctx.selectedMember = undefined;
+	ctx.page = 0;
 	await dumpInteractionContext(ctx);
 
 	await interaction.update({
@@ -226,6 +227,11 @@ async function onTribeCreateRequested(interaction: Interaction) {
 		const tribe = response.data;
 
 		ctx.tribes.push(tribe);
+		ctx.selectedTribe = tribe.id;
+		ctx.selectedMember = undefined;
+		ctx.page = 0;
+
+		addLogMessage(ctx, `Tribe \`${tribe.name}\` was created.`);
 		await dumpInteractionContext(ctx);
 
 		if (modalInteraction.isFromMessage()) {
@@ -234,13 +240,6 @@ async function onTribeCreateRequested(interaction: Interaction) {
 				flags: MessageFlags.IsComponentsV2,
 			});
 		}
-
-		const reply = await modalInteraction.followUp({
-			content: 'Tribe created successfully.',
-		});
-		setTimeout(async () => {
-			await reply.delete();
-		}, 3000);
 	} catch (err: any) {
 		if (err.code === 'InteractionCollectorError') {
 			await interaction.followUp({
@@ -248,6 +247,7 @@ async function onTribeCreateRequested(interaction: Interaction) {
 				flags: MessageFlags.Ephemeral,
 			});
 		}
+		console.error(err);
 	}
 }
 
@@ -293,6 +293,9 @@ async function onMemberKickRequested(interaction: Interaction) {
 			(member) => member.id !== userToKick.id,
 		);
 		ctx.selectedMember = undefined;
+		if (ctx.page + 1 > Math.floor(tribe.members!.length / 5)) {
+			ctx.page = 0;
+		}
 		addLogMessage(
 			ctx,
 			`${userMention(userToKick.discord_id)} was kicked from \`${tribe.name}\``,
@@ -459,6 +462,48 @@ async function onMemberDemoteRequested(interaction: Interaction) {
 
 	await dumpInteractionContext(ctx);
 	await interaction.editReply({
+		components: buildTribeManager(ctx),
+		flags: MessageFlags.IsComponentsV2,
+	});
+}
+
+async function onNextPageRequested(interaction: Interaction) {
+	if (!interaction.isButton()) {
+		return;
+	}
+
+	const ctx = (await loadInteractionContext(
+		interaction.user.id,
+		'Tribemanager',
+		{
+			expected: true,
+		},
+	)) as TribemanagerContext;
+
+	ctx.page += 1;
+	await dumpInteractionContext(ctx);
+	await interaction.update({
+		components: buildTribeManager(ctx),
+		flags: MessageFlags.IsComponentsV2,
+	});
+}
+
+async function onPreviousPageRequested(interaction: Interaction) {
+	if (!interaction.isButton()) {
+		return;
+	}
+
+	const ctx = (await loadInteractionContext(
+		interaction.user.id,
+		'Tribemanager',
+		{
+			expected: true,
+		},
+	)) as TribemanagerContext;
+
+	ctx.page -= 1;
+	await dumpInteractionContext(ctx);
+	await interaction.update({
 		components: buildTribeManager(ctx),
 		flags: MessageFlags.IsComponentsV2,
 	});

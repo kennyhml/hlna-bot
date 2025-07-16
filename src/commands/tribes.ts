@@ -35,6 +35,8 @@ export type TribemanagerContext = {
 	selectedMember?: UserId;
 	// Action logs of the last few actions
 	logs?: LogAction[];
+
+	page: number;
 };
 
 export async function execute(interaction: CommandInteraction) {
@@ -49,6 +51,7 @@ export async function execute(interaction: CommandInteraction) {
 		interactionKind: 'Tribemanager',
 		discordUserId: interaction.user.id,
 		tribes: [],
+		page: 0,
 	};
 
 	await refreshContext(ctx, { fetchTribes: true });

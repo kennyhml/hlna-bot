@@ -105,7 +105,7 @@ export function buildTribeManager(context: TribemanagerContext) {
 	}
 
 	if (selectedTribe) {
-		addTribeInformation(containerComponent, selectedTribe);
+		addTribeInformation(containerComponent, selectedTribe, context.logs || []);
 	}
 
 	addTribeManagementButtons(containerComponent, selectedTribe);
@@ -117,6 +117,7 @@ export function buildTribeManager(context: TribemanagerContext) {
 		addMemberSection(
 			containerComponent,
 			selectedTribe.members || [],
+			context.page,
 			context.selectedMember,
 		);
 		if (context.selectedMember) {
@@ -129,13 +130,13 @@ export function buildTribeManager(context: TribemanagerContext) {
 			);
 		}
 		containerComponent.addSeparatorComponents(new SeparatorBuilder());
-		addMemberPageButtons(containerComponent, 0, 5);
-	}
 
-	if (context.logs?.length !== 0) {
-		addLogArea(containerComponent, context.logs!);
+		addMemberPageButtons(
+			containerComponent,
+			context.page,
+			Math.floor(selectedTribe.members!.length / 5) + 1,
+		);
 	}
-
 	containerComponent.setAccentColor(0x00e5fe);
 
 	return [header, containerComponent];
@@ -144,6 +145,7 @@ export function buildTribeManager(context: TribemanagerContext) {
 function addMemberSection(
 	container: ContainerBuilder,
 	members: TribeMember[],
+	page: number,
 	selected?: number,
 ) {
 	container.addMediaGalleryComponents(
@@ -152,15 +154,17 @@ function addMemberSection(
 		),
 	);
 
-	members.forEach((member, index) =>
-		container.addSectionComponents(
-			buildMemberRow(
-				member,
-				member.id === selected,
-				index === 4 && selected !== undefined,
+	members
+		.slice(page * 5, page * 5 + 5)
+		.forEach((member, index) =>
+			container.addSectionComponents(
+				buildMemberRow(
+					member,
+					member.id === selected,
+					index === 4 && selected !== undefined,
+				),
 			),
-		),
-	);
+		);
 }
 
 function buildMemberRow(
@@ -192,9 +196,6 @@ function buildMemberActions(
 	member: TribeMember,
 	user: TribeMember,
 ) {
-	if (member.id == user.id) {
-		return;
-	}
 	const currentRankIndex = RANK_PRIORITY.findIndex((v) => v === member.rank);
 	const userRankIndex = RANK_PRIORITY.findIndex((v) => v === user.rank);
 
@@ -205,7 +206,7 @@ function buildMemberActions(
 	}
 	const row = new ActionRowBuilder<ButtonBuilder>();
 
-	if (currentRankIndex !== 0) {
+	if (currentRankIndex !== 0 && !(currentRankIndex === userRankIndex)) {
 		const nextRank = RANK_PRIORITY[currentRankIndex - 1];
 		row.addComponents(
 			new ButtonBuilder()
@@ -229,34 +230,44 @@ function buildMemberActions(
 				.setLabel(`Demote to ${previousRank}`),
 		);
 	}
-
-	row.addComponents(
-		new ButtonBuilder()
-			.setCustomId(TribemanagerEvents.MemberKickRequested)
-			.setStyle(ButtonStyle.Danger)
-			.setEmoji('1392921854221619470')
-			.setLabel('Remove from Tribe'),
-	);
+	if (user.id !== member.id) {
+		row.addComponents(
+			new ButtonBuilder()
+				.setCustomId(TribemanagerEvents.MemberKickRequested)
+				.setStyle(ButtonStyle.Danger)
+				.setEmoji('1392921854221619470')
+				.setLabel('Remove from Tribe'),
+		);
+	}
 
 	container.addActionRowComponents(row);
 }
 
-function addTribeInformation(container: ContainerBuilder, tribe: Tribe) {
+function addTribeInformation(
+	container: ContainerBuilder,
+	tribe: Tribe,
+	logs: LogAction[],
+) {
 	const created = Math.floor(Date.parse(tribe.created) / 1000);
 
 	const owner = tribe.members?.find((m) => m.rank === TribeRank.Owner);
 	const mention = owner?.discord_id ? userMention(owner?.discord_id) : 'N/A;';
 
+	var content = [
+		'### ⤷ Tribe Information',
+		`> **HLNA Identifier:\t\`#${tribe.id}\`**`,
+		`> **Current Owner:\t  \`${owner?.name || '-'}\` (${mention})**`,
+		`> **Date of Creation:\t<t:${created}:D>**`,
+		`> **Member Count:\t  \`${tribe.members?.length || 0}\`**\n`,
+	].join('\n');
+
+	if (logs.length !== 0) {
+		content +=
+			'### ⤷ Action Logs\n' +
+			logs.map((log) => `> -# **${log.time}: ${log.message}**`).join('\n');
+	}
 	container.addTextDisplayComponents(
-		new TextDisplayBuilder().setContent(
-			[
-				'## ⤷ Tribe Information',
-				`>>> **HLNA Identifier:\t\`#${tribe.id}\`**`,
-				`**Current Owner:\t  \`${owner?.name || '-'}\` (${mention})**`,
-				`**Date of Creation:\t<t:${created}:D>**`,
-				`**Member Count:\t  \`${tribe.members?.length || 0}\`**`,
-			].join('\n'),
-		),
+		new TextDisplayBuilder().setContent(content),
 	);
 }
 
@@ -319,7 +330,7 @@ function addMemberPageButtons(
 			.setCustomId(TribemanagerEvents.PreviousPageRequested)
 			.setLabel('↩ Show Previous Members Page')
 			.setStyle(ButtonStyle.Primary)
-			.setDisabled(currentPage == 0),
+			.setDisabled(currentPage === 0),
 		new ButtonBuilder()
 			.setCustomId('page')
 			.setLabel(`Current Page: ${currentPage + 1}/${maxPages}`)

@@ -81,7 +81,7 @@ async function onSubmit(interaction: ModalSubmitInteraction) {
 		})
 		.then(async (response) => {
 			await interaction.editReply({
-				content: '[200 OK]:' + response.data,
+				content: 'Registered successfully.',
 			});
 		})
 		.catch(async (err) => {
