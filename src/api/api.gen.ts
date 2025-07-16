@@ -710,6 +710,26 @@ export class HlnaApi<
     /**
      * No description
      *
+     * @name AddTribemember
+     * @summary Removes the tribemember from this tribe
+     * @request POST:/tribes/{tribe_id}/members/{user_id}
+     * @secure
+     */
+    addTribemember: (
+      tribeId: number,
+      userId: UserId,
+      params: RequestParams = {},
+    ) =>
+      this.request<void, ErrorMessage>({
+        path: `/tribes/${tribeId}/members/${userId}`,
+        method: "POST",
+        secure: true,
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
      * @name RemoveTribemember
      * @summary Removes the tribemember from this tribe
      * @request DELETE:/tribes/{tribe_id}/members/{user_id}
@@ -724,6 +744,32 @@ export class HlnaApi<
         path: `/tribes/${tribeId}/members/${userId}`,
         method: "DELETE",
         secure: true,
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @name UpdateTribemember
+     * @summary Updates the tribemembers data in this tribe
+     * @request PATCH:/tribes/{tribe_id}/members/{user_id}
+     * @secure
+     */
+    updateTribemember: (
+      tribeId: number,
+      userId: UserId,
+      data: {
+        /** The kind of association a user has with a tribe */
+        rank: TribeRank;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<void, ErrorMessage>({
+        path: `/tribes/${tribeId}/members/${userId}`,
+        method: "PATCH",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
         ...params,
       }),
   };

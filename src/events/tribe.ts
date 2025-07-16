@@ -9,6 +9,7 @@ import {
 import { buildTribeCreateModal } from '@/components/modals/new_tribe';
 import {
 	buildTribeManager,
+	RANK_PRIORITY,
 	TribemanagerEvent,
 } from '@/components/tribemanager';
 import {
@@ -33,7 +34,7 @@ export const EVENT_MAP: Record<TribemanagerEvent, EventHandler> = {
 	MemberSelected: onMemberSelected,
 	EditTribeRequested: async (i: Interaction) => {},
 	LeaveTribeRequested: async (i: Interaction) => {},
-	MemberPromoteRequested: async (i: Interaction) => {},
+	MemberPromoteRequested: onMemberPromoteRequested,
 	MemberDemoteRequested: async (i: Interaction) => {},
 	MemberKickRequested: onMemberKickRequested,
 	PreviousPageRequested: async (i: Interaction) => {},
@@ -172,6 +173,7 @@ async function onTribeChanged(interaction: Interaction) {
 	)) as TribemanagerContext;
 
 	ctx.selectedTribe = selectedTribeId;
+	ctx.selectedMember = undefined;
 	await dumpInteractionContext(ctx);
 
 	await interaction.update({
@@ -294,6 +296,81 @@ async function onMemberKickRequested(interaction: Interaction) {
 		addLogMessage(
 			ctx,
 			`${userMention(userToKick.discord_id)} was kicked from \`${tribe.name}\``,
+		);
+	} catch (err: any) {
+		const msg = err.response?.data?.message;
+		console.error(err.response?.data);
+		addLogMessage(ctx, msg);
+	}
+
+	await dumpInteractionContext(ctx);
+	await interaction.editReply({
+		components: buildTribeManager(ctx),
+		flags: MessageFlags.IsComponentsV2,
+	});
+}
+
+async function onMemberPromoteRequested(interaction: Interaction) {
+	if (!interaction.isButton()) {
+		return;
+	}
+
+	const ctx = (await loadInteractionContext(
+		interaction.user.id,
+		'Tribemanager',
+		{
+			expected: true,
+		},
+	)) as TribemanagerContext;
+
+	const tribe = ctx.tribes.find((tribe) => tribe.id === ctx.selectedTribe);
+	if (!tribe) {
+		throw Error('Invalid tribe selection.');
+	}
+	const userToPromote = tribe.members?.find(
+		(member) => member.id === ctx.selectedMember,
+	);
+	const promotedBy = tribe.members?.find(
+		(member) => member.discord_id === interaction.user.id,
+	);
+
+	if (!userToPromote || !promotedBy) {
+		throw Error('No member is currently selected.');
+	}
+
+	console.log(
+		`Promotion requested for user ${userToPromote.name} in tribe ${tribe.name} by ${promotedBy.name}`,
+	);
+
+	const currentRankIndex = RANK_PRIORITY.findIndex(
+		(rank) => rank === userToPromote.rank,
+	);
+	const nextRank = RANK_PRIORITY[currentRankIndex - 1];
+
+	await interaction.deferUpdate();
+	try {
+		await api.tribes.updateTribemember(
+			tribe.id,
+			userToPromote.id,
+			{
+				rank: nextRank,
+			},
+			{
+				headers: {
+					Authorization: await getProxyBearerJWT(interaction.user.id),
+				},
+			},
+		);
+		console.log('Member promoted successfully.');
+		userToPromote.rank = nextRank;
+
+		// Remove the member from the tribe internally to avoid
+		// making another request to get the data.
+		addLogMessage(
+			ctx,
+			`${userMention(userToPromote.discord_id)} was promoted to \`${
+				userToPromote.rank
+			}\``,
 		);
 	} catch (err: any) {
 		const msg = err.response?.data?.message;

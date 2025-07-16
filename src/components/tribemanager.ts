@@ -30,7 +30,7 @@ const ADMIN_ICON = '<:Admin:1393336036318249120> ';
 const MEMBER_ICON = '<:Member:1393336034967814205> ';
 const ALLY_ICON = '<:Ally:1393336033374113913>';
 
-const RANK_PRIORITY = [
+export const RANK_PRIORITY = [
 	TribeRank.Owner,
 	TribeRank.Admin,
 	TribeRank.Member,
@@ -123,6 +123,9 @@ export function buildTribeManager(context: TribemanagerContext) {
 			buildMemberActions(
 				containerComponent,
 				selectedTribe.members?.find((m) => m.id === context.selectedMember)!,
+				selectedTribe.members?.find(
+					(m) => m.discord_id === context.discordUserId,
+				)!,
 			);
 		}
 		containerComponent.addSeparatorComponents(new SeparatorBuilder());
@@ -184,12 +187,24 @@ function buildMemberRow(
 		);
 }
 
-function buildMemberActions(container: ContainerBuilder, member: TribeMember) {
+function buildMemberActions(
+	container: ContainerBuilder,
+	member: TribeMember,
+	user: TribeMember,
+) {
+	if (member.id == user.id) {
+		return;
+	}
 	const currentRankIndex = RANK_PRIORITY.findIndex((v) => v === member.rank);
+	const userRankIndex = RANK_PRIORITY.findIndex((v) => v === user.rank);
 
+	// 0 and 1 is Owner and Admin, nobody else should be able to perform these actions.
+	// Also check if the target has a higher rank than we do (e.g owner, then we cant do anything.)
+	if (userRankIndex > 1 || currentRankIndex < userRankIndex) {
+		return;
+	}
 	const row = new ActionRowBuilder<ButtonBuilder>();
 
-	//TODO: Check if we have permissions to demote / promote (either owner or admin)
 	if (currentRankIndex !== 0) {
 		const nextRank = RANK_PRIORITY[currentRankIndex - 1];
 		row.addComponents(
@@ -197,7 +212,11 @@ function buildMemberActions(container: ContainerBuilder, member: TribeMember) {
 				.setCustomId(TribemanagerEvents.MemberPromoteRequested)
 				.setStyle(ButtonStyle.Success)
 				.setEmoji(getIconForRole(nextRank))
-				.setLabel(`Promote to ${nextRank}`),
+				.setLabel(
+					nextRank === TribeRank.Owner
+						? `Transfer Ownership`
+						: `Promote to ${nextRank}`,
+				),
 		);
 	}
 	if (currentRankIndex !== RANK_PRIORITY.length - 1) {
