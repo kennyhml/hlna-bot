@@ -156,12 +156,13 @@ function addMemberSection(
 
 	members
 		.slice(page * 5, page * 5 + 5)
-		.forEach((member, index) =>
+		.forEach((member, index, arr) =>
 			container.addSectionComponents(
 				buildMemberRow(
 					member,
 					member.id === selected,
-					index === 4 && selected !== undefined,
+					members.find((m) => m.id === selected)!,
+					index === arr.length - 1 && selected !== undefined,
 				),
 			),
 		);
@@ -170,12 +171,13 @@ function addMemberSection(
 function buildMemberRow(
 	member: TribeMember,
 	isSelected: boolean,
+	selected: TribeMember,
 	showInfo: boolean,
 ) {
 	const icon = getIconForRole(member.rank);
 	var content = `### ${icon} ${member.name} (<@${member.discord_id}>)`;
 	if (showInfo) {
-		content += '\n## ⤷ Tribemember Actions';
+		content += `\n### ⤷ Managing ${userMention(selected.discord_id)}`;
 	}
 
 	return new SectionBuilder()
