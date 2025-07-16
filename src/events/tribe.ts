@@ -34,7 +34,7 @@ export const EVENT_MAP: Record<TribemanagerEvent, EventHandler> = {
 	NewMemberSelected: onNewMemberSelected,
 	MemberSelected: onMemberSelected,
 	EditTribeRequested: onEditTribeRequested,
-	LeaveTribeRequested: async (i: Interaction) => {},
+	LeaveTribeRequested: onMemberLeaveRequested,
 	MemberPromoteRequested: onMemberPromoteRequested,
 	MemberDemoteRequested: onMemberDemoteRequested,
 	MemberKickRequested: onMemberKickRequested,
@@ -282,17 +282,23 @@ async function onMemberKickRequested(interaction: Interaction) {
 	);
 	await interaction.deferUpdate();
 	try {
-		await api.tribes.removeTribemember(tribe.id, userToKick.id, {
-			headers: {
-				Authorization: await getProxyBearerJWT(interaction.user.id),
+		const response = await api.tribes.removeTribemember(
+			tribe.id,
+			userToKick.id,
+			{
+				headers: {
+					Authorization: await getProxyBearerJWT(interaction.user.id),
+				},
 			},
-		});
+		);
+		if (response.status === 204) {
+			throw Error('Unexpected 204 from kicking.');
+		}
+
 		console.log('Member kicked successfully.');
 		// Remove the member from the tribe internally to avoid
 		// making another request to get the data.
-		tribe.members = tribe.members?.filter(
-			(member) => member.id !== userToKick.id,
-		);
+		Object.assign(tribe, response.data);
 		ctx.selectedMember = undefined;
 		if (ctx.page + 1 > Math.floor(tribe.members!.length / 5)) {
 			ctx.page = 0;
@@ -588,4 +594,69 @@ async function onEditTribeRequested(interaction: Interaction) {
 		}
 		console.error(err);
 	}
+}
+
+async function onMemberLeaveRequested(interaction: Interaction) {
+	if (!interaction.isButton()) {
+		return;
+	}
+
+	const ctx = (await loadInteractionContext(
+		interaction.user.id,
+		'Tribemanager',
+		{
+			expected: true,
+		},
+	)) as TribemanagerContext;
+
+	const tribe = ctx.tribes.find((tribe) => tribe.id === ctx.selectedTribe);
+	if (!tribe) {
+		throw Error('Invalid tribe selection.');
+	}
+	const leavingUser = tribe.members?.find(
+		(member) => member.discord_id === interaction.user.id,
+	);
+
+	if (!leavingUser) {
+		throw Error('Could not get the user to leave');
+	}
+
+	console.log(`${leavingUser.name} requested to leave tribe ${tribe.name}`);
+	await interaction.deferUpdate();
+	try {
+		const response = await api.tribes.removeTribemember(
+			tribe.id,
+			leavingUser.id,
+			{
+				headers: {
+					Authorization: await getProxyBearerJWT(interaction.user.id),
+				},
+			},
+		);
+
+		// The tribe was deleted as a result of the user leaving
+		if (response.status === 204) {
+			console.log('The tribe was deleted.');
+		} else {
+			console.log('Owner was transferred.');
+		}
+
+		// Reset the interaction context
+		ctx.tribes = ctx.tribes.filter((t) => t.id !== tribe.id);
+		ctx.selectedTribe = ctx.tribes[0]?.id;
+		ctx.selectedMember = undefined;
+		ctx.page = 0;
+
+		addLogMessage(ctx, `You left \`${tribe.name}\``);
+	} catch (err: any) {
+		const msg = err.response?.data?.message;
+		console.error(err.response?.data);
+		addLogMessage(ctx, msg);
+	}
+
+	await dumpInteractionContext(ctx);
+	await interaction.editReply({
+		components: buildTribeManager(ctx),
+		flags: MessageFlags.IsComponentsV2,
+	});
 }

@@ -321,7 +321,7 @@ function addTribeManagementButtons(
 					.setStyle(ButtonStyle.Success),
 				new ButtonBuilder()
 					.setCustomId(TribemanagerEvents.EditTribeRequested)
-					.setLabel('Edit Tribe')
+					.setLabel('Edit')
 					.setEmoji('1392616309098811503')
 					.setStyle(ButtonStyle.Secondary),
 			);
@@ -330,8 +330,12 @@ function addTribeManagementButtons(
 		// to the next admin that has been in tribe the longest.
 		row.addComponents(
 			new ButtonBuilder()
+				.setCustomId('refresh')
+				.setLabel('↻ Refresh')
+				.setStyle(ButtonStyle.Secondary),
+			new ButtonBuilder()
 				.setCustomId(TribemanagerEvents.LeaveTribeRequested)
-				.setLabel('Leave Tribe')
+				.setLabel('Leave')
 				.setEmoji('1392921854221619470')
 				.setStyle(ButtonStyle.Danger),
 		);

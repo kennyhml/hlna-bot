@@ -766,10 +766,11 @@ export class HlnaApi<
       userId: UserId,
       params: RequestParams = {},
     ) =>
-      this.request<void, ErrorMessage>({
+      this.request<Tribe, ErrorMessage>({
         path: `/tribes/${tribeId}/members/${userId}`,
         method: "DELETE",
         secure: true,
+        format: "json",
         ...params,
       }),
 
