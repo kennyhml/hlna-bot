@@ -764,12 +764,13 @@ export class HlnaApi<
       },
       params: RequestParams = {},
     ) =>
-      this.request<void, ErrorMessage>({
+      this.request<Tribe, ErrorMessage>({
         path: `/tribes/${tribeId}/members/${userId}`,
         method: "PATCH",
         body: data,
         secure: true,
         type: ContentType.Json,
+        format: "json",
         ...params,
       }),
   };

@@ -35,7 +35,7 @@ export const EVENT_MAP: Record<TribemanagerEvent, EventHandler> = {
 	EditTribeRequested: async (i: Interaction) => {},
 	LeaveTribeRequested: async (i: Interaction) => {},
 	MemberPromoteRequested: onMemberPromoteRequested,
-	MemberDemoteRequested: async (i: Interaction) => {},
+	MemberDemoteRequested: onMemberDemoteRequested,
 	MemberKickRequested: onMemberKickRequested,
 	PreviousPageRequested: async (i: Interaction) => {},
 	NextPageRequested: async (i: Interaction) => {},
@@ -323,7 +323,7 @@ async function onMemberPromoteRequested(interaction: Interaction) {
 		},
 	)) as TribemanagerContext;
 
-	const tribe = ctx.tribes.find((tribe) => tribe.id === ctx.selectedTribe);
+	var tribe = ctx.tribes.find((tribe) => tribe.id === ctx.selectedTribe);
 	if (!tribe) {
 		throw Error('Invalid tribe selection.');
 	}
@@ -338,18 +338,17 @@ async function onMemberPromoteRequested(interaction: Interaction) {
 		throw Error('No member is currently selected.');
 	}
 
-	console.log(
-		`Promotion requested for user ${userToPromote.name} in tribe ${tribe.name} by ${promotedBy.name}`,
-	);
-
 	const currentRankIndex = RANK_PRIORITY.findIndex(
 		(rank) => rank === userToPromote.rank,
 	);
 	const nextRank = RANK_PRIORITY[currentRankIndex - 1];
 
+	console.log(
+		`Promotion to ${nextRank} requested for user ${userToPromote.name} in tribe ${tribe.name} by ${promotedBy.name}`,
+	);
 	await interaction.deferUpdate();
 	try {
-		await api.tribes.updateTribemember(
+		const response = await api.tribes.updateTribemember(
 			tribe.id,
 			userToPromote.id,
 			{
@@ -362,15 +361,95 @@ async function onMemberPromoteRequested(interaction: Interaction) {
 			},
 		);
 		console.log('Member promoted successfully.');
-		userToPromote.rank = nextRank;
+
+		// The full tribe data is returned as promoting one user to owner may
+		// automatically demote another user.
+		Object.assign(tribe, response.data);
 
 		// Remove the member from the tribe internally to avoid
 		// making another request to get the data.
 		addLogMessage(
 			ctx,
-			`${userMention(userToPromote.discord_id)} was promoted to \`${
-				userToPromote.rank
-			}\``,
+			`${userMention(
+				userToPromote.discord_id,
+			)} was promoted to \`${nextRank}\``,
+		);
+	} catch (err: any) {
+		const msg = err.response?.data?.message;
+		console.error(err.response?.data);
+		addLogMessage(ctx, msg);
+	}
+
+	await dumpInteractionContext(ctx);
+	await interaction.editReply({
+		components: buildTribeManager(ctx),
+		flags: MessageFlags.IsComponentsV2,
+	});
+}
+
+async function onMemberDemoteRequested(interaction: Interaction) {
+	if (!interaction.isButton()) {
+		return;
+	}
+
+	const ctx = (await loadInteractionContext(
+		interaction.user.id,
+		'Tribemanager',
+		{
+			expected: true,
+		},
+	)) as TribemanagerContext;
+
+	var tribe = ctx.tribes.find((tribe) => tribe.id === ctx.selectedTribe);
+	if (!tribe) {
+		throw Error('Invalid tribe selection.');
+	}
+	const userToDemote = tribe.members?.find(
+		(member) => member.id === ctx.selectedMember,
+	);
+	const promotedBy = tribe.members?.find(
+		(member) => member.discord_id === interaction.user.id,
+	);
+
+	if (!userToDemote || !promotedBy) {
+		throw Error('No member is currently selected.');
+	}
+
+	const currentRankIndex = RANK_PRIORITY.findIndex(
+		(rank) => rank === userToDemote.rank,
+	);
+	const previousRank = RANK_PRIORITY[currentRankIndex + 1];
+
+	console.log(
+		`Demotion to ${previousRank} requested for user ${userToDemote.name} in tribe ${tribe.name} by ${promotedBy.name}`,
+	);
+	await interaction.deferUpdate();
+	try {
+		const response = await api.tribes.updateTribemember(
+			tribe.id,
+			userToDemote.id,
+			{
+				rank: previousRank,
+			},
+			{
+				headers: {
+					Authorization: await getProxyBearerJWT(interaction.user.id),
+				},
+			},
+		);
+		console.log('Member demoted successfully.');
+
+		// The full tribe data is returned as promoting one user to owner may
+		// automatically demote another user.
+		Object.assign(tribe, response.data);
+
+		// Remove the member from the tribe internally to avoid
+		// making another request to get the data.
+		addLogMessage(
+			ctx,
+			`${userMention(
+				userToDemote.discord_id,
+			)} was demoted to \`${previousRank}\``,
 		);
 	} catch (err: any) {
 		const msg = err.response?.data?.message;
