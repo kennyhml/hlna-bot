@@ -638,6 +638,32 @@ export class HlnaApi<
     /**
      * No description
      *
+     * @name UpdateTribe
+     * @summary Change properties of this Tribe
+     * @request PATCH:/tribes/{tribe_id}
+     * @secure
+     */
+    updateTribe: (
+      tribeId: number,
+      data: {
+        /** The name of a tribe created by a user */
+        name: TribeName;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<Tribe, ErrorMessage>({
+        path: `/tribes/${tribeId}`,
+        method: "PATCH",
+        body: data,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
      * @name CreateTribe
      * @summary Create a new tribe which logically groups users together
      * @request POST:/tribes

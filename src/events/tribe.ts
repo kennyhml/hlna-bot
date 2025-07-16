@@ -6,7 +6,8 @@ import {
 	refreshContext,
 	TribemanagerContext,
 } from '@/commands/tribes';
-import { buildTribeCreateModal } from '@/components/modals/new_tribe';
+import { buildTribeCreateModal } from '@/components/modals/createTribe';
+import { buildEditTribeModal } from '@/components/modals/editTribe';
 import {
 	buildTribeManager,
 	RANK_PRIORITY,
@@ -32,7 +33,7 @@ export const EVENT_MAP: Record<TribemanagerEvent, EventHandler> = {
 	TribeCreateRequested: onTribeCreateRequested,
 	NewMemberSelected: onNewMemberSelected,
 	MemberSelected: onMemberSelected,
-	EditTribeRequested: async (i: Interaction) => {},
+	EditTribeRequested: onEditTribeRequested,
 	LeaveTribeRequested: async (i: Interaction) => {},
 	MemberPromoteRequested: onMemberPromoteRequested,
 	MemberDemoteRequested: onMemberDemoteRequested,
@@ -121,7 +122,7 @@ async function onNewMemberSelected(interaction: Interaction): Promise<void> {
 	await interaction.deferUpdate();
 
 	try {
-		const response = await api.tribes.addTribeMembers(
+		await api.tribes.addTribeMembers(
 			tribe.id,
 			{
 				members: [{ discord_id: userId }],
@@ -507,4 +508,84 @@ async function onPreviousPageRequested(interaction: Interaction) {
 		components: buildTribeManager(ctx),
 		flags: MessageFlags.IsComponentsV2,
 	});
+}
+
+async function onEditTribeRequested(interaction: Interaction) {
+	if (!interaction.isButton()) {
+		return;
+	}
+
+	const ctx = (await loadInteractionContext(
+		interaction.user.id,
+		'Tribemanager',
+		{
+			expected: true,
+		},
+	)) as TribemanagerContext;
+
+	const tribe = ctx.tribes.find((t) => t.id === ctx.selectedTribe);
+	if (!tribe) {
+		return;
+	}
+
+	const modal = buildEditTribeModal(interaction.user, tribe);
+
+	await interaction.showModal(modal);
+
+	// Create a filter for modal submissions that will identify this one.
+	const filter = (interaction: ModalSubmitInteraction) =>
+		interaction.customId === modal.data.custom_id;
+
+	var modalInteraction: ModalSubmitInteraction | undefined = undefined;
+
+	try {
+		modalInteraction = await interaction.awaitModalSubmit({
+			filter,
+			time: 60_000,
+		});
+
+		// Make sure the user knows something is going on..
+		await modalInteraction.deferUpdate();
+
+		const newName = modalInteraction.fields.getTextInputValue('tribename');
+		const newDescription =
+			modalInteraction.fields.getTextInputValue('tribename');
+
+		if (!newName) {
+			console.log('No edits to the tribe were made.');
+			return;
+		}
+
+		const response = await api.tribes.updateTribe(
+			tribe.id,
+			{
+				name: newName,
+			},
+			{
+				headers: {
+					Authorization: await getProxyBearerJWT(interaction.user.id),
+				},
+			},
+		);
+
+		Object.assign(tribe, response.data);
+
+		addLogMessage(ctx, `Tribe renamed to \`${newName}\`.`);
+		await dumpInteractionContext(ctx);
+
+		if (modalInteraction.isFromMessage()) {
+			await modalInteraction.editReply({
+				components: buildTribeManager(ctx),
+				flags: MessageFlags.IsComponentsV2,
+			});
+		}
+	} catch (err: any) {
+		if (err.code === 'InteractionCollectorError') {
+			await interaction.followUp({
+				content: 'The interaction timed out. Please try again.',
+				flags: MessageFlags.Ephemeral,
+			});
+		}
+		console.error(err);
+	}
 }

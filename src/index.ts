@@ -26,16 +26,16 @@ client.on('interactionCreate', async (interaction) => {
 					interaction,
 				);
 			}
-		} catch (err) {
+		} catch (err: any) {
 			console.error(err);
 			if (!interaction.replied && !interaction.deferred) {
 				await interaction.reply({
-					content: `An Exception occurred: ${JSON.stringify(err)}`,
+					content: `An Exception occurred: ${err.message}`,
 					flags: MessageFlags.Ephemeral,
 				});
 			} else {
 				await interaction.editReply({
-					content: `An Exception occurred: ${JSON.stringify(err)}`,
+					content: `An Exception occurred: ${err.message}`,
 				});
 			}
 		}

@@ -108,7 +108,12 @@ export function buildTribeManager(context: TribemanagerContext) {
 		addTribeInformation(containerComponent, selectedTribe, context.logs || []);
 	}
 
-	addTribeManagementButtons(containerComponent, selectedTribe);
+	addTribeManagementButtons(
+		containerComponent,
+		selectedTribe,
+		selectedTribe?.members!.find((m) => m.discord_id === context.discordUserId)
+			?.rank,
+	);
 	if (context.memberSelectExpanded) {
 		addNewMemberSelect(containerComponent);
 	}
@@ -118,6 +123,8 @@ export function buildTribeManager(context: TribemanagerContext) {
 			containerComponent,
 			selectedTribe.members || [],
 			context.page,
+			selectedTribe.members?.find((m) => m.discord_id === context.discordUserId)
+				?.rank!,
 			context.selectedMember,
 		);
 		if (context.selectedMember) {
@@ -146,6 +153,7 @@ function addMemberSection(
 	container: ContainerBuilder,
 	members: TribeMember[],
 	page: number,
+	myRank: TribeRank,
 	selected?: number,
 ) {
 	container.addMediaGalleryComponents(
@@ -162,6 +170,7 @@ function addMemberSection(
 					member,
 					member.id === selected,
 					members.find((m) => m.id === selected)!,
+					myRank,
 					index === arr.length - 1 && selected !== undefined,
 				),
 			),
@@ -172,6 +181,7 @@ function buildMemberRow(
 	member: TribeMember,
 	isSelected: boolean,
 	selected: TribeMember,
+	myRank: TribeRank,
 	showInfo: boolean,
 ) {
 	const icon = getIconForRole(member.rank);
@@ -179,18 +189,30 @@ function buildMemberRow(
 	if (showInfo) {
 		content += `\n### ⤷ Managing ${userMention(selected.discord_id)}`;
 	}
+	const hasAuthority =
+		myRank === TribeRank.Owner ||
+		(myRank === TribeRank.Admin && member.rank !== TribeRank.Owner);
+
+	const button = new ButtonBuilder();
+	if (isSelected) {
+		button.setLabel('Cancel');
+	} else if (hasAuthority) {
+		button.setLabel('Manage');
+	} else {
+		button.setLabel('🔒').setDisabled(true);
+	}
+
+	if (hasAuthority) {
+		button.setEmoji('1392616309098811503');
+	}
+
+	button
+		.setCustomId(`${TribemanagerEvents.MemberSelected}-${member.id.toString()}`)
+		.setStyle(isSelected ? ButtonStyle.Danger : ButtonStyle.Secondary);
 
 	return new SectionBuilder()
 		.addTextDisplayComponents(new TextDisplayBuilder().setContent(content))
-		.setButtonAccessory(
-			new ButtonBuilder()
-				.setLabel(isSelected ? 'Cancel' : 'Manage')
-				.setCustomId(
-					`${TribemanagerEvents.MemberSelected}-${member.id.toString()}`,
-				)
-				.setStyle(isSelected ? ButtonStyle.Danger : ButtonStyle.Secondary)
-				.setEmoji('1392616309098811503'),
-		);
+		.setButtonAccessory(button);
 }
 
 function buildMemberActions(
@@ -273,38 +295,48 @@ function addTribeInformation(
 	);
 }
 
-function addTribeManagementButtons(container: ContainerBuilder, tribe?: Tribe) {
+function addTribeManagementButtons(
+	container: ContainerBuilder,
+	tribe?: Tribe,
+	userRank?: TribeRank,
+) {
 	const row = new ActionRowBuilder<ButtonBuilder>();
 
 	row.addComponents(
 		new ButtonBuilder()
 			.setCustomId(TribemanagerEvents.TribeCreateRequested)
-			.setLabel('Create a new Tribe')
+			.setLabel('Create Tribe')
 			.setEmoji('1392921273029623950')
 			.setStyle(ButtonStyle.Success),
 	);
 
-	if (tribe) {
+	if (tribe && userRank) {
+		// Only Admins and Owners can invite Members and Edit the Tribe
+		if (userRank === TribeRank.Admin || userRank === TribeRank.Owner) {
+			row.addComponents(
+				new ButtonBuilder()
+					.setCustomId(TribemanagerEvents.MemberAddRequested)
+					.setLabel('Add Tribemember')
+					.setEmoji('1392921274665144460')
+					.setStyle(ButtonStyle.Success),
+				new ButtonBuilder()
+					.setCustomId(TribemanagerEvents.EditTribeRequested)
+					.setLabel('Edit Tribe')
+					.setEmoji('1392616309098811503')
+					.setStyle(ButtonStyle.Secondary),
+			);
+		}
+		// Leaving is always possible, if the owner leaves then owner is simply given
+		// to the next admin that has been in tribe the longest.
 		row.addComponents(
 			new ButtonBuilder()
-				.setCustomId(TribemanagerEvents.MemberAddRequested)
-				.setLabel('Add Tribemember')
-				.setEmoji('1392921274665144460')
-				.setStyle(ButtonStyle.Success),
-			new ButtonBuilder()
-				.setCustomId(TribemanagerEvents.EditTribeRequested)
-				.setLabel('Edit')
-				.setEmoji('1392616309098811503')
-				.setStyle(ButtonStyle.Secondary),
-			new ButtonBuilder()
 				.setCustomId(TribemanagerEvents.LeaveTribeRequested)
-				.setLabel('Leave')
+				.setLabel('Leave Tribe')
 				.setEmoji('1392921854221619470')
 				.setStyle(ButtonStyle.Danger),
 		);
+		container.addActionRowComponents(row);
 	}
-
-	container.addActionRowComponents(row);
 }
 
 function addNewMemberSelect(container: ContainerBuilder) {
