@@ -40,6 +40,7 @@ export const EVENT_MAP: Record<TribemanagerEvent, EventHandler> = {
 	MemberKickRequested: onMemberKickRequested,
 	PreviousPageRequested: onPreviousPageRequested,
 	NextPageRequested: onNextPageRequested,
+	RefreshRequested: onRefreshRequested,
 };
 
 async function onMemberAddRequested(interaction: Interaction): Promise<void> {
@@ -656,6 +657,26 @@ async function onMemberLeaveRequested(interaction: Interaction) {
 
 	await dumpInteractionContext(ctx);
 	await interaction.editReply({
+		components: buildTribeManager(ctx),
+		flags: MessageFlags.IsComponentsV2,
+	});
+}
+
+async function onRefreshRequested(interaction: Interaction) {
+	if (!interaction.isButton()) {
+		return;
+	}
+
+	const ctx = (await loadInteractionContext(
+		interaction.user.id,
+		'Tribemanager',
+		{
+			expected: true,
+		},
+	)) as TribemanagerContext;
+
+	await refreshContext(ctx, { fetchTribes: true });
+	await interaction.update({
 		components: buildTribeManager(ctx),
 		flags: MessageFlags.IsComponentsV2,
 	});

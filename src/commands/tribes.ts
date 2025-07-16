@@ -76,12 +76,14 @@ export async function refreshContext(
 		ctx.selectedTribe = ctx.tribes.find(
 			(tribe) => tribe.id === ctx.selectedTribe,
 		)?.id;
+		ctx.page = 0;
 		changes = true;
 	}
 	// Make sure the selected tribe exists in the list
 	if (!ctx.tribes.find((tribe) => tribe.id === ctx.selectedTribe)) {
 		ctx.selectedTribe = undefined;
 		ctx.memberSelectExpanded = false;
+		ctx.page = 0;
 		changes = true;
 	}
 
@@ -89,6 +91,7 @@ export async function refreshContext(
 	if (!ctx.selectedTribe && ctx.tribes.length !== 0) {
 		ctx.selectedTribe = ctx.tribes[0].id;
 		ctx.memberSelectExpanded = false;
+		ctx.page = 0;
 		changes = true;
 	}
 

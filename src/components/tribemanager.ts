@@ -50,6 +50,7 @@ const TribemanagerEvents = {
 	PreviousPageRequested: 'PreviousPageRequested',
 	NextPageRequested: 'NextPageRequested',
 	MemberSelected: 'MemberSelected',
+	RefreshRequested: 'RefreshRequested',
 } as const;
 
 export type TribemanagerEvent =
@@ -330,7 +331,7 @@ function addTribeManagementButtons(
 		// to the next admin that has been in tribe the longest.
 		row.addComponents(
 			new ButtonBuilder()
-				.setCustomId('refresh')
+				.setCustomId(TribemanagerEvents.RefreshRequested)
 				.setLabel('↻ Refresh')
 				.setStyle(ButtonStyle.Secondary),
 			new ButtonBuilder()
