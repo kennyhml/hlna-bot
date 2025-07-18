@@ -7,10 +7,12 @@ import {
 } from 'discord.js';
 import { api } from '@/api/api';
 import { getProxyBearerJWT } from '@/api/auth';
+import { DiscordId } from '../api/api.gen';
 import {
-	buildConfigManager,
+	buildConfigmanager,
 	ConfigmanagerContext,
 } from '@/components/configmanager';
+import { dumpInteractionContext } from '@/contextmanager';
 
 export const command = new SlashCommandBuilder()
 	.setName('configs')
@@ -24,80 +26,67 @@ export async function execute(interaction: CommandInteraction) {
 	});
 
 	var ctx: ConfigmanagerContext = {
-		configData: [
-			{
-				id: 123,
-				name: 'Mock Config',
-				owner: 1233131,
-				created: '',
-				shareTribes: [],
-				taskData: [
-					{
-						id: 1234,
-						name: 'Gacha Tower',
-						type: 'GACHAFEED',
-						priority: 1,
-						enabled: false,
-						tasks: [],
-					},
-				],
-			},
-		],
-		selectedConfig: 123,
+		interactionKind: 'Configmanager',
+		discordUserId: interaction.user.id,
+		currentPage: 0,
+		configs: [],
+		logs: [],
 	};
+
+	await refreshContext(ctx, { fetchConfigs: true });
 
 	await reply.edit({
 		flags: MessageFlags.IsComponentsV2,
-		components: buildConfigManager(ctx),
-	});
-
-	const collector = reply.createMessageComponentCollector({
-		filter: (i: Interaction) => interaction.user.id == i.user.id,
-	});
-
-	// Connect the events for this interaction
-	collector.on('collect', async (interaction) => {
-		console.log(interaction.customId);
-		// if (interaction.customId === 'createTribe') {
-		// 	await onTribeCreateRequested(
-		// 		interaction as ButtonInteraction,
-		// 		async (submitInteraction: ModalSubmitInteraction) => {
-		// 			// Rebuild the tribe manager components
-		// 			ctx = await getTribeContextFromServer(interaction.user.id);
-		// 			await reply.edit({ components: buildTribeManager(ctx) });
-		// 			await submitInteraction.deleteReply();
-		// 		},
-		// 	);
-		// } else if (interaction.customId == 'selectedTribe') {
-		// 	const values = (interaction as StringSelectMenuInteraction).values;
-		// 	ctx.selectedTribe = parseInt(values[0]);
-		// 	await reply.edit({ components: buildTribeManager(ctx) });
-		// 	await interaction.deferUpdate();
-		// } else if (interaction.customId == 'addMember') {
-		// 	ctx.memberSelectExpanded = true;
-		// 	await reply.edit({ components: buildTribeManager(ctx) });
-		// 	await interaction.deferUpdate();
-		// }
+		components: buildConfigmanager(ctx),
 	});
 }
 
-async function getTribeContextFromServer(
-	userId: Snowflake,
-): Promise<ConfigmanagerContext> {
-	const token = await getProxyBearerJWT(userId);
-
-	const data = await api.users
-		.getCurrentUserTribes({ headers: { Authorization: token } })
-		.then(async (response) => {
-			return response.data;
-		})
-		.catch(async (err) => {
-			console.error(err);
-			// TODO: Make a meaningful error of whatever the api throws at us
-			throw err;
+export async function refreshContext(
+	ctx: ConfigmanagerContext,
+	params: { fetchConfigs?: boolean },
+) {
+	var changes: boolean = false;
+	if (params.fetchConfigs) {
+		const token = await getProxyBearerJWT(ctx.discordUserId);
+		const response = await api.configs.getUserConfigurations({
+			headers: { Authorization: token },
 		});
+		ctx.configs = response.data;
+		ctx.selectedConfig = ctx.configs.find(
+			(cfg) => cfg.id === ctx.selectedConfig,
+		)?.id;
+		ctx.currentPage = 0;
+		changes = true;
+	}
+	// Make sure the selected tribe exists in the list
+	if (!ctx.configs.find((c) => c.id === ctx.selectedConfig)) {
+		ctx.selectedConfig = undefined;
+		ctx.currentPage = 0;
+		changes = true;
+	}
 
-	return {
-		configData: [],
-	};
+	// If no tribe is currently selected, use the first tribe as default.
+	if (!ctx.selectedConfig && ctx.configs.length !== 0) {
+		ctx.selectedConfig = ctx.configs[0].id;
+		ctx.currentPage = 0;
+		changes = true;
+	}
+
+	if (changes) {
+		await dumpInteractionContext(ctx);
+	}
+}
+
+export function addLogMessage(ctx: ConfigmanagerContext, log: string) {
+	if (!ctx.logs) {
+		ctx.logs = [];
+	}
+	ctx.logs.push({
+		time: new Date().toLocaleTimeString('en-US', { hour12: false }),
+		message: log,
+	});
+
+	if (ctx.logs.length > 5) {
+		ctx.logs.shift();
+	}
 }

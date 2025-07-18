@@ -1,4 +1,6 @@
-import { Tribe } from '@/api/api.gen';
+import { Configuration, Taskgroup, Tribe } from '@/api/api.gen';
+import { LogAction } from '@/commands/tribes';
+import { InteractionContext } from '@/contextmanager';
 import {
 	ContainerBuilder,
 	StringSelectMenuBuilder,
@@ -12,9 +14,11 @@ import {
 	SectionBuilder,
 	SeparatorBuilder,
 	UserSelectMenuBuilder,
+	userMention,
+	Snowflake,
 } from 'discord.js';
 
-const HEADER_URL =
+const HEADER =
 	'https://media.discordapp.net/attachments/1392553548390338591/1393602837321093140/configmanager_header.png?ex=6873c548&is=687273c8&hm=7743e576355315c494b9dee39a65da0c06d110cc082433999992903d69614c41&=&format=webp&quality=lossless';
 
 const TASK_GROUP_SEP =
@@ -23,111 +27,102 @@ const TASK_GROUP_SEP =
 const CONFIG_SEP =
 	'https://media.discordapp.net/attachments/1392553548390338591/1393602952312262666/config_separator.png?ex=6873c563&is=687273e3&hm=f1e6151d6da93d4089f290367390aab81aaa90ab252daf8b6e83324fc6ae6b83&=&format=webp&quality=lossless';
 
-export interface TaskGroup {
-	id: number;
-	name: string;
-	type: string;
-	enabled: boolean;
-	tasks: undefined[];
-	priority: number;
-}
+export type ConfigmanagerContext = InteractionContext & {
+	configs: Configuration[];
 
-export interface Config {
-	id: number;
-	owner: number; // userid
-	name: string;
-	created: string;
-	shareTribes: Tribe[];
-	taskData: TaskGroup[];
-}
-
-export interface ConfigmanagerContext {
-	configData: Config[];
 	selectedConfig?: number;
 	isAddingTask?: boolean;
 	groupFilter?: string;
-}
 
-export function buildConfigManager(context: ConfigmanagerContext) {
-	const configSelect = new StringSelectMenuBuilder()
-		.setCustomId('selectedConfig')
-		.setDisabled(context.configData.length === 0)
-		.setMaxValues(1)
-		.setPlaceholder('Select one of your configurations.')
-		.setMinValues(1);
+	currentPage: 0;
+	logs: LogAction[];
+};
 
-	const selectedConfig = context.configData.find(
-		(v) => v.id === context.selectedConfig,
+const ConfigurationEvents = {
+	ConfigurationChanged: 'ConfigurationChanged',
+} as const;
+
+export type TaskmanagerEvent =
+	(typeof ConfigurationEvents)[keyof typeof ConfigurationEvents];
+
+export function buildConfigmanager(ctx: ConfigmanagerContext) {
+	const container = new ContainerBuilder().setAccentColor(0x00e5fe);
+
+	const selected = ctx.configs.find((cfg) => cfg.id === ctx.selectedConfig);
+
+	// CONFIG SEPERATOR
+	container.addMediaGalleryComponents(
+		new MediaGalleryBuilder().addItems(
+			new MediaGalleryItemBuilder().setURL(CONFIG_SEP),
+		),
 	);
 
-	if (selectedConfig) {
-		selectedConfig.taskData?.sort((a, b) => a.priority - b.priority);
-	}
+	// CONFIG SELECTION
+	container.addActionRowComponents(
+		new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+			new StringSelectMenuBuilder()
+				.setCustomId(ConfigurationEvents.ConfigurationChanged)
+				.setDisabled(ctx.configs.length === 0)
+				.setPlaceholder('Select one of your taskgroups to display.')
+				.setMaxValues(1)
+				.setMinValues(1)
+				.addOptions(
+					ctx.configs.map((cfg) =>
+						new StringSelectMenuOptionBuilder()
+							.setLabel(cfg.name)
+							.setValue(cfg.name)
+							.setDescription(cfg.description || cfg.name)
+							.setDefault(cfg.id === selected?.id),
+					),
+				),
+		),
+	);
 
-	context.configData.forEach((config) => {
-		configSelect.addOptions(
-			new StringSelectMenuOptionBuilder()
-				.setLabel(config.name)
-				.setValue(config.id.toString())
-				.setDefault(config.id === selectedConfig?.id)
-				.setDescription('Config ' + config.name) // TODO: Add a description to the API?
-				.setEmoji('1393609184100220968'),
+	if (selected) {
+		const created = Math.floor(Date.parse(selected.created) / 1000);
+
+		const owner = selected.owner;
+
+		var content = [
+			'### ⤷ Taskgroup Information',
+			`> **HLNA Identifier:\t\`#${selected.id}\`**`,
+			`> **Created by:\t  \`${owner.id}\` (${userMention(owner.discord_id)})**`,
+			`> **Date of Creation:\t<t:${created}:D>**`,
+			`> **Taskgroups:\t  \`${selected.taskgroups.length}\`**\n`,
+		].join('\n');
+
+		if (ctx.logs.length !== 0) {
+			content +=
+				'### ⤷ Action Logs\n' +
+				ctx.logs
+					.map((log) => `> -# **${log.time}: ${log.message}**`)
+					.join('\n');
+		}
+		container.addTextDisplayComponents(
+			new TextDisplayBuilder().setContent(content),
 		);
-	});
-
-	const header = new MediaGalleryBuilder().addItems(
-		new MediaGalleryItemBuilder().setURL(HEADER_URL),
-	);
-
-	const configSep = new MediaGalleryBuilder().addItems(
-		new MediaGalleryItemBuilder().setURL(CONFIG_SEP),
-	);
-
-	const containerComponent = new ContainerBuilder().addMediaGalleryComponents(
-		configSep,
-	);
-
-	if (selectedConfig) {
-		containerComponent.addActionRowComponents(
-			new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
-				configSelect,
-			),
-		);
 	}
 
-	if (selectedConfig) {
-		addConfigInformation(containerComponent, selectedConfig);
-	}
-
-	addManagementButtons(containerComponent, selectedConfig);
-	if (context.isAddingTask) {
-		// addNewMemberSelect(containerComponent);
-	}
-
-	if (selectedConfig && selectedConfig.taskData.length !== 0) {
-		addTaskgroupSection(containerComponent, selectedConfig.taskData || []);
-		containerComponent.addSeparatorComponents(new SeparatorBuilder());
-		addTaskgroupPageButtons(containerComponent, 0, 5);
-	}
-
-	containerComponent.setAccentColor(0x00e5fe);
-
-	return [header, containerComponent];
-}
-
-function addTaskgroupSection(container: ContainerBuilder, tasks: TaskGroup[]) {
+	// TASKGROUPS SEPARATOR
 	container.addMediaGalleryComponents(
 		new MediaGalleryBuilder().addItems(
 			new MediaGalleryItemBuilder().setURL(TASK_GROUP_SEP),
 		),
 	);
 
-	tasks.forEach((task) =>
+	selected?.taskgroups.forEach((task) =>
 		container.addSectionComponents(buildTaskgroupRow(task)),
 	);
+
+	return [
+		new MediaGalleryBuilder().addItems(
+			new MediaGalleryItemBuilder().setURL(HEADER),
+		),
+		container,
+	];
 }
 
-function buildTaskgroupRow(taskgroup: TaskGroup) {
+function buildTaskgroupRow(taskgroup: Taskgroup) {
 	// TODO: Get icon based on task group type
 	const icon = '<:Dust:1393605645307215975>';
 
@@ -146,100 +141,4 @@ function buildTaskgroupRow(taskgroup: TaskGroup) {
 				.setStyle(ButtonStyle.Secondary)
 				.setEmoji('1392616309098811503'),
 		);
-}
-
-function addConfigInformation(container: ContainerBuilder, config: Config) {
-	const created = Math.floor(Date.parse(config.created) / 1000);
-
-	// const owner = tribe.members?.find(
-	// 	(m) => m.association === TribeAssociation.Owner,
-	// );
-	// const mention = owner?.discord_id ? userMention(owner?.discord_id) : 'N/A;';
-
-	container.addTextDisplayComponents(
-		new TextDisplayBuilder().setContent(
-			[
-				'## ⤷ Config Information',
-				`>>> **HLNA Identifier:\t\`#${config.id}\`**`,
-				// `**Current Owner:\t  \`${owner?.name || '-'}\` (${mention})**`,
-				`**Date of Creation:\t<t:${created}:D>**`,
-				`**Task Group Count:\t  \`${config.taskData.length}\`**`,
-			].join('\n'),
-		),
-	);
-}
-
-function addManagementButtons(container: ContainerBuilder, config?: Config) {
-	const row = new ActionRowBuilder<ButtonBuilder>();
-
-	row.addComponents(
-		new ButtonBuilder()
-			.setCustomId('createConfig')
-			.setLabel('New Configuration')
-			.setEmoji('1393608855908515923')
-			.setStyle(ButtonStyle.Success),
-	);
-
-	if (config) {
-		row.addComponents(
-			new ButtonBuilder()
-				.setCustomId('addTask')
-				.setLabel('Add a Task')
-				.setEmoji('1392921274665144460')
-				.setStyle(ButtonStyle.Success),
-			new ButtonBuilder()
-				.setCustomId('edit')
-				.setLabel('Edit')
-				.setEmoji('1392616309098811503')
-				.setStyle(ButtonStyle.Secondary),
-			new ButtonBuilder()
-				.setCustomId('delete')
-				.setLabel('Delete')
-				.setEmoji('1392921854221619470')
-				.setStyle(ButtonStyle.Danger),
-		);
-	}
-
-	container.addActionRowComponents(row);
-}
-
-function addNewMemberSelect(container: ContainerBuilder) {
-	container.addTextDisplayComponents(
-		new TextDisplayBuilder().setContent('## ↪ New Member'),
-	);
-	const row = new ActionRowBuilder<UserSelectMenuBuilder>().addComponents(
-		new UserSelectMenuBuilder()
-			.setCustomId('newMember')
-			.setMinValues(1)
-			.setMaxValues(1)
-			.setPlaceholder('Select the Task Group to add to the configuration.'),
-	);
-
-	container.addActionRowComponents(row);
-}
-
-function addTaskgroupPageButtons(
-	container: ContainerBuilder,
-	currentPage: number,
-	maxPages: number,
-) {
-	const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-		new ButtonBuilder()
-			.setCustomId('prev')
-			.setLabel('↩ Show Previous Task Page')
-			.setStyle(ButtonStyle.Primary)
-			.setDisabled(currentPage == 0),
-		new ButtonBuilder()
-			.setCustomId('page')
-			.setLabel(`Current Page: ${currentPage + 1}/${maxPages}`)
-			.setStyle(ButtonStyle.Secondary)
-			.setDisabled(true),
-		new ButtonBuilder()
-			.setCustomId('next')
-			.setLabel('Show Next Task Page ↪')
-			.setStyle(ButtonStyle.Primary)
-			.setDisabled(currentPage + 1 === maxPages),
-	);
-
-	container.addActionRowComponents(row);
 }
